@@ -9,6 +9,7 @@ import { registerWidgetTreeTools } from "./tools/widget-tree.js";
 import { registerProfilingTools } from "./tools/profiling.js";
 import { registerMemoryTools } from "./tools/memory.js";
 import { registerDebugActionTools } from "./tools/debug-actions.js";
+import { registerRebuildTrackerTools } from "./tools/rebuild-tracker.js";
 
 const server = new McpServer({
   name: "flutter-devtools-mcp",
@@ -23,6 +24,7 @@ registerWidgetTreeTools(server, vmClient);
 registerProfilingTools(server, vmClient, profiler);
 registerMemoryTools(server, vmClient);
 registerDebugActionTools(server, vmClient);
+registerRebuildTrackerTools(server, vmClient);
 
 vmClient.on("error", (err) => {
   console.error("[flutter-devtools-mcp] VM Service error:", err);

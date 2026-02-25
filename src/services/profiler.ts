@@ -276,6 +276,30 @@ export class Profiler {
       .slice(0, 20);
   }
 
+  private static readonly PHASE_PATTERNS: Record<string, string[]> = {
+    Build: [
+      "build", "widget", "createElement", "updateChild",
+      "inflateWidget", "performRebuild", "buildScope",
+      "drawFrame", "handleBuildScheduled",
+    ],
+    Layout: [
+      "layout", "performLayout", "flushLayout",
+      "RenderFlex", "RenderBox", "RenderSliver",
+      "performResize", "markNeedsLayout",
+    ],
+    Paint: [
+      "paint", "flushPaint", "compositeFrame",
+      "rasterizer", "compositeLayers", "flushCompositingBits",
+      "markNeedsPaint", "repaintCompositedChild",
+    ],
+  };
+
+  private matchesPhase(eventName: string, phaseName: string): boolean {
+    const patterns = Profiler.PHASE_PATTERNS[phaseName] ?? [phaseName.toLowerCase()];
+    const lower = eventName.toLowerCase();
+    return patterns.some((p) => lower.includes(p));
+  }
+
   private analyzePhase(
     events: TimelineEvent[],
     phaseName: string
@@ -295,14 +319,30 @@ export class Profiler {
     maxPaintTimeMs: number;
     paintCount: number;
   } {
-    const phaseEvents = events.filter(
-      (e) =>
-        e.ph === "X" &&
-        e.dur !== undefined &&
-        e.name?.toLowerCase().includes(phaseName.toLowerCase())
-    );
+    const completeDurations = events
+      .filter(
+        (e) =>
+          e.ph === "X" &&
+          e.dur !== undefined &&
+          this.matchesPhase(e.name, phaseName)
+      )
+      .map((e) => e.dur! / 1000);
 
-    const durations = phaseEvents.map((e) => e.dur! / 1000);
+    const beginEvents = events
+      .filter((e) => e.ph === "B" && this.matchesPhase(e.name, phaseName))
+      .sort((a, b) => a.ts - b.ts);
+    const endEvents = events
+      .filter((e) => e.ph === "E" && this.matchesPhase(e.name, phaseName))
+      .sort((a, b) => a.ts - b.ts);
+
+    const pairedDurations: number[] = [];
+    const minLen = Math.min(beginEvents.length, endEvents.length);
+    for (let i = 0; i < minLen; i++) {
+      const dur = (endEvents[i].ts - beginEvents[i].ts) / 1000;
+      if (dur > 0 && dur < 5000) pairedDurations.push(dur);
+    }
+
+    const durations = [...completeDurations, ...pairedDurations];
     const total = durations.reduce((a, b) => a + b, 0);
     const max = durations.length > 0 ? Math.max(...durations) : 0;
     const avg = durations.length > 0 ? total / durations.length : 0;

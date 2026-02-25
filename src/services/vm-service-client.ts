@@ -417,6 +417,39 @@ export class FlutterVmServiceClient extends EventEmitter {
       .then(() => this.callServiceExtension("_flutter.screenshot"));
   }
 
+  async startTrackingRebuilds(isolateId?: string): Promise<void> {
+    const id = isolateId ?? this._mainIsolateId;
+    if (!id) throw new Error("No isolate ID available");
+
+    await this.callServiceExtension(
+      "ext.flutter.inspector.trackRebuildDirtyWidgets",
+      id,
+      { enabled: true }
+    );
+  }
+
+  async stopTrackingRebuilds(isolateId?: string): Promise<void> {
+    const id = isolateId ?? this._mainIsolateId;
+    if (!id) throw new Error("No isolate ID available");
+
+    await this.callServiceExtension(
+      "ext.flutter.inspector.trackRebuildDirtyWidgets",
+      id,
+      { enabled: false }
+    );
+  }
+
+  async getWidgetLocationMap(isolateId?: string): Promise<unknown> {
+    const id = isolateId ?? this._mainIsolateId;
+    if (!id) throw new Error("No isolate ID available");
+
+    const response: any = await this.callServiceExtension(
+      "ext.flutter.inspector.widgetLocationIdMap",
+      id
+    );
+    return response?.result ?? response;
+  }
+
   async getDisplayRefreshRate(): Promise<number> {
     try {
       const result = (await this.callServiceExtension(
