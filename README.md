@@ -6,11 +6,11 @@ An MCP (Model Context Protocol) server that connects AI coding assistants like *
 
 Instead of switching between your IDE and DevTools, just tell your AI assistant:
 
-> *"Profile my app while I scroll through the feed"*
+> *"Find my running Flutter app and connect to it"*
 >
-> *"Show me the widget tree for the current screen"*
+> *"Track widget rebuilds while I scroll through the feed"*
 >
-> *"Take a memory snapshot and find potential leaks"*
+> *"Take a memory snapshot, I'll fix the leak, then compare"*
 
 ```
 ┌─────────────────┐     stdio      ┌──────────────────────┐   WebSocket    ┌─────────────────┐
@@ -21,10 +21,22 @@ Instead of switching between your IDE and DevTools, just tell your AI assistant:
 
 ## Features
 
+### Auto-Discovery
+- Automatically find running Flutter apps on your machine
+- No manual URI copying — just say "connect to my Flutter app"
+- Scans processes, temp files, and common ports
+
 ### Widget Tree Inspection
-- Get the complete widget hierarchy of any screen
+- Get the complete widget hierarchy of any screen with source file locations
 - Filter to show only your project's widgets (skip framework internals)
 - Deep-inspect individual widgets for constraints, size, and state
+- Recursively expands the full tree, not just the first level
+
+### Widget Rebuild Tracking
+- Track exactly which widgets rebuild and how many times
+- Source file and line number for every rebuilding widget
+- Severity-rated output (green/yellow/orange/red)
+- Actionable recommendations for reducing unnecessary rebuilds
 
 ### Performance Profiling
 - Start/stop profiling sessions while you interact with the app
@@ -35,16 +47,28 @@ Instead of switching between your IDE and DevTools, just tell your AI assistant:
 
 ### Memory Analysis
 - Heap usage overview with utilization percentage
-- Top memory-consuming classes ranked by size and instance count
+- App & framework classes separated from VM internals
 - Automatic detection of suspicious allocation patterns
 - Optional forced GC before snapshot for accuracy
 
+### Snapshot Comparison (Before/After Diff)
+- Save named memory snapshots at any point
+- Compare two snapshots to see exactly what changed
+- Shows which classes grew/shrank with byte and instance deltas
+- Verdict: did your fix actually improve memory?
+
+### Network Traffic Inspector
+- Capture HTTP requests and responses in real-time
+- Method, URL, status code, response time, payload size
+- Flags slow requests (>2s) and large responses (>500KB)
+- Error tracking for failed requests
+
 ### Debug Actions
-- **Hot Reload** - inject code changes without losing state
-- **Hot Restart** - full restart without rebuilding
-- **Screenshot** - capture the current screen
-- **Debug Paint** - toggle widget boundary visualization
-- **Expression Evaluation** - run Dart expressions in the live app
+- **Hot Reload** — inject code changes without losing state
+- **Hot Restart** — full restart without rebuilding
+- **Screenshot** — capture the current screen
+- **Debug Paint** — toggle widget boundary visualization
+- **Expression Evaluation** — run Dart expressions in the live app
 
 ## Quick Start
 
@@ -55,14 +79,13 @@ Instead of switching between your IDE and DevTools, just tell your AI assistant:
 
 ### Installation
 
-```bash
-npm install -g flutter-devtools-mcp
-```
-
-Or run directly with npx:
+Clone and build locally:
 
 ```bash
-npx flutter-devtools-mcp
+git clone https://github.com/draganbajic/flutter-devtools-mcp.git
+cd flutter-devtools-mcp
+npm install
+npm run build
 ```
 
 ### Configuration
@@ -75,8 +98,8 @@ Add to your `.cursor/mcp.json`:
 {
   "mcpServers": {
     "flutter-devtools": {
-      "command": "npx",
-      "args": ["-y", "flutter-devtools-mcp"]
+      "command": "node",
+      "args": ["/path/to/flutter-devtools-mcp/dist/index.js"]
     }
   }
 }
@@ -90,8 +113,8 @@ Add to your `claude_desktop_config.json`:
 {
   "mcpServers": {
     "flutter-devtools": {
-      "command": "npx",
-      "args": ["-y", "flutter-devtools-mcp"]
+      "command": "node",
+      "args": ["/path/to/flutter-devtools-mcp/dist/index.js"]
     }
   }
 }
@@ -105,8 +128,8 @@ Add to your `.vscode/mcp.json`:
 {
   "servers": {
     "flutter-devtools": {
-      "command": "npx",
-      "args": ["-y", "flutter-devtools-mcp"]
+      "command": "node",
+      "args": ["/path/to/flutter-devtools-mcp/dist/index.js"]
     }
   }
 }
@@ -120,50 +143,136 @@ Add to your `.vscode/mcp.json`:
 flutter run --profile
 ```
 
-2. **Copy the VM Service URI** from the terminal output:
+2. **Ask your AI agent to discover and connect:**
 
-```
-Flutter DevTools debugging and profiling for MyApp is available at:
-http://127.0.0.1:9100?uri=http%3A%2F%2F127.0.0.1%3A50000%2FAbCdEf%3D%2F
-                                        ^
-                   Copy this URI: http://127.0.0.1:50000/AbCdEf=/
-```
+> "Find my running Flutter app and connect to it"
 
-3. **Ask your AI agent to connect:**
+Or connect manually with the VM Service URI printed in the terminal:
 
 > "Connect to my Flutter app at http://127.0.0.1:50000/AbCdEf=/"
 
-4. **Start inspecting and profiling:**
+3. **Start inspecting:**
 
 > "Show me the widget tree"
 
-> "Start profiling, I'll scroll through the list... okay stop profiling"
+> "Track widget rebuilds while I scroll through the list"
 
-> "Take a memory snapshot and check for leaks"
+> "Take a memory snapshot before I make changes"
 
-> "Hot reload the app"
+> "Start profiling, I'll navigate around... okay stop"
 
-## Tools Reference
+> "Capture network traffic while I pull to refresh"
 
+## Tools Reference (21 tools)
+
+### Discovery & Connection
 | Tool | Description |
 |------|-------------|
-| `connect` | Connect to a running Flutter app via VM Service URI |
+| `discover_apps` | Auto-find running Flutter apps and connect |
+| `connect` | Connect to a Flutter app via VM Service URI |
 | `disconnect` | Disconnect from the app |
-| `get_app_info` | Get VM info, isolates, platform details, available extensions |
-| `get_widget_tree` | Get structured widget hierarchy with project widget highlighting |
-| `inspect_widget` | Deep-inspect a widget's properties, constraints, and render info |
-| `start_profiling` | Begin a performance profiling session |
-| `stop_profiling` | End profiling and get full analysis with recommendations |
-| `get_memory_snapshot` | Memory allocation profile with leak detection |
-| `take_screenshot` | Capture current screen as PNG |
-| `toggle_debug_paint` | Toggle debug paint overlay |
+| `get_app_info` | VM info, isolates, platform details, extensions |
+
+### Widget Inspection
+| Tool | Description |
+|------|-------------|
+| `get_widget_tree` | Widget hierarchy with source locations and project filtering |
+| `inspect_widget` | Deep-inspect a widget's properties, constraints, render info |
+
+### Rebuild Tracking
+| Tool | Description |
+|------|-------------|
+| `start_tracking_rebuilds` | Start tracking which widgets rebuild |
+| `stop_tracking_rebuilds` | Get report: widget name, rebuild count, source location |
+
+### Performance Profiling
+| Tool | Description |
+|------|-------------|
+| `start_profiling` | Begin timeline profiling session |
+| `stop_profiling` | Get analysis: frames, jank, hotspots, phase breakdown |
+
+### Memory Analysis
+| Tool | Description |
+|------|-------------|
+| `get_memory_snapshot` | Heap profile with app class breakdown and leak detection |
+| `save_snapshot` | Save a named snapshot for later comparison |
+| `compare_snapshots` | Diff two snapshots: what grew, what shrank, verdict |
+| `list_snapshots` | List all saved snapshots |
+
+### Network
+| Tool | Description |
+|------|-------------|
+| `start_network_capture` | Start capturing HTTP traffic |
+| `stop_network_capture` | Report: URLs, status codes, timing, sizes, errors |
+
+### Debug Actions
+| Tool | Description |
+|------|-------------|
 | `hot_reload` | Trigger hot reload |
 | `hot_restart` | Trigger hot restart |
+| `take_screenshot` | Capture current screen as PNG |
+| `toggle_debug_paint` | Toggle debug paint overlay |
 | `evaluate_expression` | Evaluate Dart expressions in the running app |
 
 ## Example Output
 
-### Performance Profiling Report
+### Widget Rebuild Report
+
+```
+═══════════════════════════════════════════════════════════
+  WIDGET REBUILD REPORT
+═══════════════════════════════════════════════════════════
+
+📊 SUMMARY
+───────────────────────────────────────────────────────────
+Tracked for 6.2s
+Total rebuilds: 1,847
+Unique widgets rebuilt: 34
+Average rebuilds per widget: 54.3
+
+🔥 TOP REBUILDING WIDGETS
+───────────────────────────────────────────────────────────
+🔴    312x | OrderCard [order_card.dart:15]
+🔴    287x | Text [order_card.dart:43]
+🔴    284x | StatusBadge [order_card.dart:48]
+🟠     94x | SummaryCard [summary_card.dart:11]
+🟠     74x | DashboardScreen [dashboard_screen.dart:18]
+🟡     28x | SliverAppBar [dashboard_screen.dart:58]
+🟢      4x | Navigator [app_router.dart:31]
+
+💡 RECOMMENDATIONS
+───────────────────────────────────────────────────────────
+• OrderCard rebuilt 312x [order_card.dart:15]
+  → Check if it depends on a Provider that changes too
+    frequently. Consider using context.select() instead
+    of context.watch() or adding a const constructor.
+```
+
+### Snapshot Comparison
+
+```
+═══════════════════════════════════════════════════════════
+  SNAPSHOT COMPARISON
+  "before-fix" → "after-fix"
+═══════════════════════════════════════════════════════════
+
+📊 HEAP OVERVIEW
+───────────────────────────────────────────────────────────
+🟢 Heap usage: 182.84 MB → 94.12 MB (-88.72 MB, -48.5%)
+   Capacity:   199.52 MB → 128.00 MB (-71.52 MB)
+
+📉 SHRANK (top 5)
+───────────────────────────────────────────────────────────
+  🔻  -42.30 MB |   -3,412 inst | _Uint8List
+  🔻  -18.20 MB |     -847 inst | _ImageInfo
+  🔻   -6.40 MB |     -624 inst | StreamSubscription
+
+💡 VERDICT
+───────────────────────────────────────────────────────────
+✅ Memory improved by 88.72 MB (-48.5%). Nice work!
+```
+
+### Performance Profiling
 
 ```
 ═══════════════════════════════════════════════════════════
@@ -172,90 +281,48 @@ http://127.0.0.1:9100?uri=http%3A%2F%2F127.0.0.1%3A50000%2FAbCdEf%3D%2F
 
 📊 SUMMARY
 ───────────────────────────────────────────────────────────
-Profiled for 4.8s, captured 287 frames
-Average frame time: 9.12ms (target: 16.7ms)
-⚠️ 18 janky frames detected (6.3% of total)
-Worst frame: 67.45ms (4.0x target)
-
-📈 FRAME ANALYSIS
-───────────────────────────────────────────────────────────
-P90 frame time: 14.20ms
-P99 frame time: 52.88ms
+Profiled for 8.0s, captured 481 frames
+Average frame time: 8.94ms (target: 16.7ms)
+⚠️ 38 janky frames detected (7.9% of total)
+Worst frame: 94.32ms (5.6x target)
 
 🔧 PHASE BREAKDOWN
 ───────────────────────────────────────────────────────────
-Build:  avg 3.41ms | max 41.20ms | 574 calls
-Layout: avg 1.87ms | max 19.30ms | 287 calls
-Paint:  avg 2.14ms | max 11.05ms | 287 calls
+Build:  avg 3.12ms | max 38.40ms | 962 calls
+Layout: avg 1.94ms | max 22.10ms | 481 calls
+Paint:  avg 2.08ms | max 14.80ms | 481 calls
 
 🔥 CPU HOTSPOTS
 ───────────────────────────────────────────────────────────
 🔴 Build [CRITICAL]
-   Total: 1956.2ms | Avg: 3.4ms | Max: 41.2ms | Calls: 574
-🟠 LayoutBuilder [HIGH]
-   Total: 312.5ms | Avg: 5.2ms | Max: 28.7ms | Calls: 60
+   Total: 3001.4ms | Avg: 3.1ms | Max: 38.4ms | Calls: 962
 
 💡 RECOMMENDATIONS
 ───────────────────────────────────────────────────────────
-• HIGH: Excessive widget rebuilds detected (574 builds for
-  287 frames). Check for unnecessary setState calls, missing
+• HIGH: Excessive widget rebuilds detected (962 builds for
+  481 frames). Check for unnecessary setState calls, missing
   const widgets, or improper use of context.watch().
-• HIGH: Build phase exceeds frame budget. Consider using const
-  constructors, breaking up large widget trees, or using
-  RepaintBoundary.
-```
-
-### Memory Snapshot
-
-```
-═══════════════════════════════════════════════════════════
-  MEMORY SNAPSHOT
-═══════════════════════════════════════════════════════════
-
-📊 HEAP OVERVIEW
-───────────────────────────────────────────────────────────
-Heap used:     48.72 MB
-Heap capacity: 64.00 MB
-Utilization:   76.1%
-External:      12.34 MB
-Total:         61.06 MB
-
-📦 TOP 10 CLASSES BY MEMORY
-───────────────────────────────────────────────────────────
-   18.40 MB (37.8%) |    3,412 instances | _Uint8List
-    6.21 MB (12.7%) |      847 instances | _ImageInfo
-    3.88 MB  (8.0%) |   28,440 instances | _OneByteString
-    2.14 MB  (4.4%) |    1,205 instances | RenderParagraph
-    1.92 MB  (3.9%) |      960 instances | Element
-
-⚠️ POTENTIAL CONCERNS
-───────────────────────────────────────────────────────────
-• _ImageInfo: 847 instances (6.21 MB) - check if images are
-  being disposed properly when scrolling off-screen
-• RenderParagraph: 1,205 instances (2.14 MB) - large number
-  of text widgets in memory, verify ListView is using
-  itemBuilder for lazy construction
 ```
 
 ### Widget Tree
 
 ```
-Widget Tree (142 widgets, 23 from project, depth: 12)
+Widget Tree (68 widgets, 42 from project, depth: 18)
 ────────────────────────────────────────────────────────────
-MaterialApp
-  Navigator
-    HeroControllerScope
-      OrderListScreen ★
-        Scaffold
-          AppBar ★ (1 children)
-            Text [data: Orders]
-          CustomScrollView ★ (3 children)
-            SliverAppBar ★
-            SliverPadding
-              SliverList ★
-                OrderCard ★ [status: pending]
-                OrderCard ★ [status: completed]
-                OrderCard ★ [status: cancelled]
+RootWidget (1 children)
+  MyApp ★ (1 children) [main.dart:12]
+    MaterialApp ★ (1 children) [app.dart:45]
+      Navigator ★ (2 children) [app_router.dart:31]
+        DashboardScreen ★ (1 children) [dashboard_screen.dart:18]
+          Scaffold ★ (2 children) [dashboard_screen.dart:42]
+            CustomScrollView ★ (3 children) [dashboard_screen.dart:56]
+              SliverList ★ (1 children) [dashboard_screen.dart:71]
+                OrderCard ★ (2 children) [order_card.dart:15]
+                  Row ★ (3 children) [order_card.dart:34]
+                    CachedNetworkImage ★ [order_card.dart:36]
+                    Text ★ [order_card.dart:43]
+                    StatusBadge ★ [order_card.dart:48]
+            BottomNavigationBar ★ (4 children) [dashboard_screen.dart:95]
 ```
 
 ## Profile Mode vs Debug Mode
@@ -266,30 +333,34 @@ For accurate performance numbers, always use profile mode:
 flutter run --profile
 ```
 
-Debug mode includes overhead from assertions, debug checks, and the observatory that can make performance appear worse than reality. The MCP server works in both modes, but profiling data from debug mode should be taken with a grain of salt.
+Debug mode includes overhead from assertions and debug checks that make performance appear worse than reality. The MCP server works in both modes, but profiling data from debug mode should be taken with a grain of salt.
 
 ## How It Works
 
-This MCP server communicates with your Flutter app through the **Dart VM Service Protocol** -- the same protocol that Flutter DevTools uses under the hood. When you run a Flutter app in debug or profile mode, it exposes a WebSocket endpoint that supports JSON-RPC 2.0 commands for:
+This MCP server communicates with your Flutter app through the **Dart VM Service Protocol** — the same protocol that Flutter DevTools uses under the hood. When you run a Flutter app in debug or profile mode, it exposes a WebSocket endpoint that supports JSON-RPC 2.0 commands for:
 
 - Isolate management and inspection
 - Widget tree traversal (via Flutter service extensions)
+- Widget rebuild tracking (`trackRebuildDirtyWidgets`)
 - Timeline and CPU profiling
 - Memory allocation tracking
+- HTTP traffic logging
 - Code evaluation
 - Hot reload / restart
 
-The MCP server wraps these low-level protocol calls into AI-agent-friendly tools with structured output, severity ratings, and actionable recommendations -- so the AI can reason about your app's runtime behavior and suggest concrete fixes.
+The MCP server wraps these low-level protocol calls into AI-agent-friendly tools with structured output, severity ratings, and actionable recommendations — so the AI can reason about your app's runtime behavior and suggest concrete fixes.
 
 ## Roadmap
 
-- [ ] Auto-discover running Flutter apps (no manual URI copy)
-- [ ] Network traffic inspection (HTTP request/response capture)
+- [x] Auto-discover running Flutter apps
+- [x] Widget rebuild tracking with source locations
+- [x] Network traffic inspection
+- [x] Before/after snapshot comparison
 - [ ] Continuous monitoring mode (watch for jank in real-time)
 - [ ] Integration test runner with performance baselines
 - [ ] Shader compilation jank detection
-- [ ] Widget rebuild tracking with flame chart data
 - [ ] Export reports as markdown/HTML
+- [ ] npm publish for `npx flutter-devtools-mcp`
 
 ## Contributing
 
