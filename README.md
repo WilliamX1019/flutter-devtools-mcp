@@ -62,6 +62,7 @@ Instead of switching between your IDE and DevTools, just tell your AI assistant:
 - Method, URL, status code, response time, payload size
 - Flags slow requests (>2s) and large responses (>500KB)
 - Error tracking for failed requests
+- **Note:** Relies on `dart:io` HttpClient timeline events. May not capture traffic from some GraphQL clients (Ferry, gql_http_link) or custom HTTP implementations that bypass `dart:io` instrumentation.
 
 ### Debug Actions
 - **Hot Reload** — inject code changes without losing state
