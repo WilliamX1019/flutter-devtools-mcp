@@ -10,21 +10,27 @@ import { registerProfilingTools } from "./tools/profiling.js";
 import { registerMemoryTools } from "./tools/memory.js";
 import { registerDebugActionTools } from "./tools/debug-actions.js";
 import { registerRebuildTrackerTools } from "./tools/rebuild-tracker.js";
+import { registerDiscoverTools } from "./tools/discover.js";
+import { registerNetworkTools } from "./tools/network.js";
+import { registerSnapshotDiffTools } from "./tools/snapshot-diff.js";
 
 const server = new McpServer({
   name: "flutter-devtools-mcp",
-  version: "0.1.0",
+  version: "0.2.0",
 });
 
 const vmClient = new FlutterVmServiceClient();
 const profiler = new Profiler(vmClient);
 
+registerDiscoverTools(server, vmClient);
 registerConnectionTools(server, vmClient);
 registerWidgetTreeTools(server, vmClient);
 registerProfilingTools(server, vmClient, profiler);
 registerMemoryTools(server, vmClient);
-registerDebugActionTools(server, vmClient);
 registerRebuildTrackerTools(server, vmClient);
+registerNetworkTools(server, vmClient);
+registerSnapshotDiffTools(server, vmClient);
+registerDebugActionTools(server, vmClient);
 
 vmClient.on("error", (err) => {
   console.error("[flutter-devtools-mcp] VM Service error:", err);

@@ -6,3 +6,4 @@ dist/
 debug-raw.ts
 test-client.ts
 test-screenshot.ts
+demo-output.ts
