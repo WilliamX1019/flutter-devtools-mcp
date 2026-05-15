@@ -6,12 +6,23 @@ import { FlutterVmServiceClient } from "../services/vm-service-client.js";
 
 const execAsync = promisify(exec);
 
+/**
+ * 已发现的 Flutter 应用程序的结构
+ */
 interface DiscoveredApp {
   vmServiceUri: string;
   pid: number;
   platform?: string;
 }
 
+/**
+ * 扫描系统查找正在运行的 Flutter/Dart 进程及其 VM Service URI
+ * 采用多种策略: 
+ * 1. 使用 ps 命令过滤
+ * 2. 扫描临时目录中的 vmservice.json 文件
+ * 3. 扫描常见端口
+ * @returns 包含已发现应用程序的数组
+ */
 async function findFlutterProcesses(): Promise<DiscoveredApp[]> {
   const apps: DiscoveredApp[] = [];
 
@@ -114,10 +125,16 @@ async function findFlutterProcesses(): Promise<DiscoveredApp[]> {
   });
 }
 
+/**
+ * 注册应用程序发现相关的 MCP 工具
+ * @param server MCP 服务器实例
+ * @param client Flutter VM Service 客户端实例
+ */
 export function registerDiscoverTools(
   server: McpServer,
   client: FlutterVmServiceClient
 ) {
+  // 注册 "discover_apps" 工具：自动扫描并可能连接本地正在运行的 Flutter 应用
   server.registerTool("discover_apps", {
                 description: "Automatically discover running Flutter apps on this machine. Scans for Dart VM Service instances so you don't have to manually copy the URI. If an app is found, you can connect to it directly.",
     inputSchema: {

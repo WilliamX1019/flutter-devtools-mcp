@@ -2,11 +2,17 @@ import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { FlutterVmServiceClient } from "../services/vm-service-client.js";
 
+/**
+ * 重建事件数据结构，反映来自 Flutter Framework 的重建通知
+ */
 interface RebuildEvent {
   locations: Record<string, { file: string; line: number; column: number; name: string }>;
   events: Array<number>;
 }
 
+/**
+ * 单个 Widget 的重建统计条目
+ */
 interface RebuildEntry {
   widgetName: string;
   file: string;
@@ -14,6 +20,12 @@ interface RebuildEntry {
   rebuildCount: number;
 }
 
+/**
+ * 注册追踪 Widget 重建分析相关的 MCP 工具
+ * 包括启动和停止重建追踪
+ * @param server MCP 服务器实例
+ * @param client Flutter VM Service 客户端实例
+ */
 export function registerRebuildTrackerTools(
   server: McpServer,
   client: FlutterVmServiceClient
@@ -45,6 +57,7 @@ export function registerRebuildTrackerTools(
     }
   };
 
+  // 注册 "start_tracking_rebuilds" 工具：启动重建跟踪器收集状态变化导致的重建事件
   server.registerTool("start_tracking_rebuilds", {
                 description: "Start tracking which widgets are rebuilding and how often. After starting, interact with the app, then call stop_tracking_rebuilds to see exactly which widgets rebuilt, how many times, and where they are in your code. This is the most effective way to find unnecessary rebuilds."
               }, async () => {
@@ -114,6 +127,7 @@ export function registerRebuildTrackerTools(
           }
         });
 
+  // 注册 "stop_tracking_rebuilds" 工具：停止收集并输出重建统计分析报告
   server.registerTool("stop_tracking_rebuilds", {
                 description: "Stop tracking widget rebuilds and get a detailed report showing exactly which widgets rebuilt, how many times, and their source file locations. Sorted by rebuild count to highlight the most problematic widgets.",
     inputSchema: {

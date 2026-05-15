@@ -1,6 +1,9 @@
 import WebSocket from "ws";
 import { EventEmitter } from "events";
 
+/**
+ * JSON-RPC 2.0 请求对象接口
+ */
 interface JsonRpcRequest {
   jsonrpc: "2.0";
   id: string;
@@ -8,6 +11,9 @@ interface JsonRpcRequest {
   params?: Record<string, unknown>;
 }
 
+/**
+ * JSON-RPC 2.0 响应对象接口
+ */
 interface JsonRpcResponse {
   jsonrpc: "2.0";
   id: string;
@@ -15,12 +21,18 @@ interface JsonRpcResponse {
   error?: { code: number; message: string; data?: unknown };
 }
 
+/**
+ * JSON-RPC 2.0 通知对象接口 (无 id)
+ */
 interface JsonRpcNotification {
   jsonrpc: "2.0";
   method: string;
   params?: Record<string, unknown>;
 }
 
+/**
+ * Dart Isolate 的引用信息
+ */
 export interface IsolateRef {
   type: string;
   id: string;
@@ -29,6 +41,9 @@ export interface IsolateRef {
   isSystemIsolate: boolean;
 }
 
+/**
+ * Dart VM 虚拟机信息
+ */
 export interface VMInfo {
   type: string;
   name: string;
@@ -43,6 +58,9 @@ export interface VMInfo {
   isolateGroups: unknown[];
 }
 
+/**
+ * Timeline 时间线事件数据结构
+ */
 export interface TimelineEvent {
   name: string;
   cat: string;
@@ -54,6 +72,9 @@ export interface TimelineEvent {
   args?: Record<string, unknown>;
 }
 
+/**
+ * 类的内存堆分配统计信息
+ */
 export interface ClassHeapStats {
   class: {
     name: string;
@@ -66,6 +87,9 @@ export interface ClassHeapStats {
   instancesAccumulated: number;
 }
 
+/**
+ * 内存分配概要
+ */
 export interface AllocationProfile {
   members: ClassHeapStats[];
   memoryUsage: {
@@ -75,6 +99,10 @@ export interface AllocationProfile {
   };
 }
 
+/**
+ * Flutter VM Service 客户端
+ * 封装了与 Dart VM Service 的 WebSocket 通信逻辑，提供了各类调试和状态获取的方法
+ */
 export class FlutterVmServiceClient extends EventEmitter {
   private ws: WebSocket | null = null;
   private requestId = 0;
@@ -90,18 +118,32 @@ export class FlutterVmServiceClient extends EventEmitter {
   private _vmServiceUri: string | null = null;
   private _mainIsolateId: string | null = null;
 
+  /**
+   * 当前是否已连接到 VM Service
+   */
   get connected(): boolean {
     return this._connected;
   }
 
+  /**
+   * 当前连接的 VM Service URI
+   */
   get vmServiceUri(): string | null {
     return this._vmServiceUri;
   }
 
+  /**
+   * 主 Isolate (Flutter UI 线程) 的 ID
+   */
   get mainIsolateId(): string | null {
     return this._mainIsolateId;
   }
 
+  /**
+   * 连接到指定的 VM Service URI
+   * @param vmServiceUri VM Service 的 HTTP 或 WebSocket URI
+   * @returns 包含 VM 信息的 Promise
+   */
   async connect(vmServiceUri: string): Promise<VMInfo> {
     if (this._connected) {
       await this.disconnect();
@@ -124,6 +166,7 @@ export class FlutterVmServiceClient extends EventEmitter {
 
         try {
           const vmInfo = (await this.callMethod("getVM")) as VMInfo;
+          // 查找非系统 Isolate，通常第一个即为 Flutter 的主 Isolate
           const flutterIsolate = vmInfo.isolates.find(
             (i) => !i.isSystemIsolate
           );
@@ -157,6 +200,9 @@ export class FlutterVmServiceClient extends EventEmitter {
     });
   }
 
+  /**
+   * 断开与 VM Service 的连接
+   */
   async disconnect(): Promise<void> {
     if (this.ws) {
       this.rejectAllPending("Disconnecting");
@@ -168,6 +214,12 @@ export class FlutterVmServiceClient extends EventEmitter {
     }
   }
 
+  /**
+   * 调用 VM Service 原生方法 (如 getVM, getIsolate 等)
+   * @param method 方法名
+   * @param params 附加参数
+   * @returns 方法执行结果
+   */
   async callMethod(
     method: string,
     params?: Record<string, unknown>
@@ -195,6 +247,13 @@ export class FlutterVmServiceClient extends EventEmitter {
     });
   }
 
+  /**
+   * 调用 Flutter 扩展服务方法 (如 ext.flutter.inspector.getRootWidgetTree)
+   * @param method 服务扩展名
+   * @param isolateId 可选的目标 Isolate ID（默认使用主 Isolate）
+   * @param args 扩展方法的其他参数
+   * @returns 扩展执行结果
+   */
   async callServiceExtension(
     method: string,
     isolateId?: string,
@@ -207,16 +266,29 @@ export class FlutterVmServiceClient extends EventEmitter {
     return this.callMethod(method, params);
   }
 
+  /**
+   * 获取 Dart VM 基础信息
+   */
   async getVM(): Promise<VMInfo> {
     return (await this.callMethod("getVM")) as VMInfo;
   }
 
+  /**
+   * 获取指定 Isolate 的详细信息
+   */
   async getIsolate(isolateId?: string): Promise<unknown> {
     const id = isolateId ?? this._mainIsolateId;
     if (!id) throw new Error("No isolate ID available");
     return this.callMethod("getIsolate", { isolateId: id });
   }
 
+  /**
+   * 在给定的 Isolate（或帧栈）中计算 Dart 表达式
+   * @param expression Dart 表达式
+   * @param isolateId Isolate ID
+   * @param frameIndex (可选) 帧栈索引，如果提供则在指定帧下执行
+   * @returns 表达式计算结果
+   */
   async evaluate(
     expression: string,
     isolateId?: string,
@@ -247,6 +319,12 @@ export class FlutterVmServiceClient extends EventEmitter {
     });
   }
 
+  /**
+   * 获取 Flutter 应用程序的根 Widget 树
+   * @param isolateId Isolate ID
+   * @param maxDepth 最大遍历深度，默认 20
+   * @returns 包含 Widget 树结构的对象
+   */
   async getWidgetTree(
     isolateId?: string,
     maxDepth: number = 20
@@ -280,6 +358,14 @@ export class FlutterVmServiceClient extends EventEmitter {
     return root;
   }
 
+  /**
+   * 递归展开 Widget 树的子节点
+   * @param node 当前 Widget 节点
+   * @param isolateId Isolate ID
+   * @param objectGroup 检查器对象组
+   * @param depth 当前深度
+   * @param maxDepth 最大允许深度
+   */
   private async expandWidgetChildren(
     node: any,
     isolateId: string,
@@ -322,6 +408,12 @@ export class FlutterVmServiceClient extends EventEmitter {
     }
   }
 
+  /**
+   * 获取特定 Widget 的详细属性信息
+   * @param widgetId Widget 的标识 ID
+   * @param isolateId Isolate ID
+   * @returns 包含 Widget 属性细节的对象
+   */
   async getWidgetDetails(
     widgetId: string,
     isolateId?: string
@@ -341,14 +433,27 @@ export class FlutterVmServiceClient extends EventEmitter {
     return response?.result ?? response;
   }
 
+  /**
+   * 获取当前启用的 Timeline 标志（追踪类别）
+   */
   async getTimelineFlags(): Promise<unknown> {
     return this.callMethod("getVMTimelineFlags");
   }
 
+  /**
+   * 设置需要记录的 Timeline 标志
+   * @param recordedStreams 要记录的流列表 (如 "Dart", "Embedder", "GC")
+   */
   async setTimelineFlags(recordedStreams: string[]): Promise<void> {
     await this.callMethod("setVMTimelineFlags", { recordedStreams });
   }
 
+  /**
+   * 抓取 Timeline 数据（性能分析时间线）
+   * @param timeOriginMicros 可选，起始时间 (微秒)
+   * @param timeExtentMicros 可选，时间范围 (微秒)
+   * @returns 包含 Timeline 事件数组的对象
+   */
   async getTimeline(
     timeOriginMicros?: number,
     timeExtentMicros?: number
@@ -363,10 +468,19 @@ export class FlutterVmServiceClient extends EventEmitter {
     };
   }
 
+  /**
+   * 清空现有的 Timeline 数据缓存
+   */
   async clearTimeline(): Promise<void> {
     await this.callMethod("clearVMTimeline");
   }
 
+  /**
+   * 获取内存分配的剖析数据
+   * @param isolateId Isolate ID
+   * @param gc 是否在获取前触发一次垃圾回收
+   * @returns 类的内存占用及堆使用情况
+   */
   async getAllocationProfile(
     isolateId?: string,
     gc?: boolean
@@ -383,16 +497,25 @@ export class FlutterVmServiceClient extends EventEmitter {
     )) as AllocationProfile;
   }
 
+  /**
+   * 执行热重载 (Hot Reload)
+   */
   async hotReload(isolateId?: string): Promise<unknown> {
     const id = isolateId ?? this._mainIsolateId;
     if (!id) throw new Error("No isolate ID available");
     return this.callServiceExtension("ext.flutter.reassemble", id);
   }
 
+  /**
+   * 执行热重启 (Hot Restart)
+   */
   async hotRestart(): Promise<unknown> {
     return this.callServiceExtension("ext.flutter.restart");
   }
 
+  /**
+   * 切换界面 Debug 绘制模式 (显示布局边界)
+   */
   async toggleDebugPaint(isolateId?: string): Promise<unknown> {
     const id = isolateId ?? this._mainIsolateId;
     if (!id) throw new Error("No isolate ID available");
@@ -407,6 +530,9 @@ export class FlutterVmServiceClient extends EventEmitter {
     });
   }
 
+  /**
+   * 截取当前 App 屏幕画面
+   */
   async screenshot(): Promise<unknown> {
     return this.callServiceExtension(
       "ext.flutter.debugAllowBanner",
@@ -417,6 +543,9 @@ export class FlutterVmServiceClient extends EventEmitter {
       .then(() => this.callServiceExtension("_flutter.screenshot"));
   }
 
+  /**
+   * 开启 Widget 重建(Rebuild)追踪
+   */
   async startTrackingRebuilds(isolateId?: string): Promise<void> {
     const id = isolateId ?? this._mainIsolateId;
     if (!id) throw new Error("No isolate ID available");
@@ -428,6 +557,9 @@ export class FlutterVmServiceClient extends EventEmitter {
     );
   }
 
+  /**
+   * 关闭 Widget 重建追踪
+   */
   async stopTrackingRebuilds(isolateId?: string): Promise<void> {
     const id = isolateId ?? this._mainIsolateId;
     if (!id) throw new Error("No isolate ID available");
@@ -439,6 +571,9 @@ export class FlutterVmServiceClient extends EventEmitter {
     );
   }
 
+  /**
+   * 获取 Widget 创建位置的文件映射
+   */
   async getWidgetLocationMap(isolateId?: string): Promise<unknown> {
     const id = isolateId ?? this._mainIsolateId;
     if (!id) throw new Error("No isolate ID available");
@@ -450,6 +585,9 @@ export class FlutterVmServiceClient extends EventEmitter {
     return response?.result ?? response;
   }
 
+  /**
+   * 获取设备/屏幕的显示刷新率 (FPS)
+   */
   async getDisplayRefreshRate(): Promise<number> {
     try {
       const result = (await this.callServiceExtension(
@@ -461,6 +599,9 @@ export class FlutterVmServiceClient extends EventEmitter {
     }
   }
 
+  /**
+   * 订阅相关的 VM 事件流 (如 GC, 日志, Timeline 等)
+   */
   private async subscribeToStreams(): Promise<void> {
     const streams = [
       "Isolate",
@@ -482,6 +623,10 @@ export class FlutterVmServiceClient extends EventEmitter {
     }
   }
 
+  /**
+   * 处理 WebSocket 接收到的 JSON 消息
+   * @param data 从 WebSocket 接收的原始字符串数据
+   */
   private handleMessage(data: string): void {
     let message: JsonRpcResponse | JsonRpcNotification;
     try {
@@ -518,6 +663,11 @@ export class FlutterVmServiceClient extends EventEmitter {
     }
   }
 
+  /**
+   * 拒绝所有处于 pending 状态的请求
+   * 主要在连接断开或异常时调用
+   * @param reason 拒绝的错误原因
+   */
   private rejectAllPending(reason: string): void {
     for (const [id, pending] of this.pendingRequests) {
       clearTimeout(pending.timer);
@@ -526,6 +676,11 @@ export class FlutterVmServiceClient extends EventEmitter {
     }
   }
 
+  /**
+   * 规范化 VM Service 的连接 URL 为 WebSocket URL 格式
+   * @param uri 输入的原始 URI (如 http://127.0.0.1:...)
+   * @returns 转换后的 WebSocket URI
+   */
   private toWebSocketUri(uri: string): string {
     let wsUri = uri.replace(/^https?:\/\//, "ws://");
 

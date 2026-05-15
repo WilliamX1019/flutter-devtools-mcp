@@ -1,11 +1,17 @@
 import { FlutterVmServiceClient, TimelineEvent } from "./vm-service-client.js";
 
+/**
+ * 性能分析会话记录
+ */
 export interface ProfilingSession {
   startTime: number;
   endTime?: number;
   targetFps: number;
 }
 
+/**
+ * 帧率及卡顿分析结果
+ */
 export interface FrameAnalysis {
   totalFrames: number;
   jankFrames: number;
@@ -17,6 +23,9 @@ export interface FrameAnalysis {
   targetFrameTimeMs: number;
 }
 
+/**
+ * CPU 执行热点分析结果
+ */
 export interface CpuHotspot {
   name: string;
   category: string;
@@ -27,6 +36,9 @@ export interface CpuHotspot {
   severity: "low" | "medium" | "high" | "critical";
 }
 
+/**
+ * 综合性能剖析结果
+ */
 export interface ProfilingResult {
   durationMs: number;
   totalEventsCollected: number;
@@ -54,6 +66,10 @@ export interface ProfilingResult {
   recommendations: string[];
 }
 
+/**
+ * Flutter 性能分析器
+ * 利用 Timeline 数据对应用的帧率、构建阶段、布局、绘制以及 CPU 热点进行深度分析
+ */
 export class Profiler {
   private session: ProfilingSession | null = null;
   private client: FlutterVmServiceClient;
@@ -62,10 +78,17 @@ export class Profiler {
     this.client = client;
   }
 
+  /**
+   * 判断当前是否正在进行性能分析会话
+   */
   get isActive(): boolean {
     return this.session !== null && this.session.endTime === undefined;
   }
 
+  /**
+   * 启动性能分析会话
+   * 开启必要的 Timeline 标志并记录起始时间
+   */
   async start(): Promise<void> {
     if (this.isActive) {
       throw new Error("Profiling session already active");
@@ -87,6 +110,10 @@ export class Profiler {
     };
   }
 
+  /**
+   * 停止当前性能分析会话并生成报告
+   * @returns 包含各阶段分析和优化建议的性能剖析结果
+   */
   async stop(): Promise<ProfilingResult> {
     if (!this.session || this.session.endTime !== undefined) {
       throw new Error("No active profiling session");
@@ -107,6 +134,12 @@ export class Profiler {
     return result;
   }
 
+  /**
+   * 核心分析逻辑：处理 Timeline 事件并生成分项统计数据
+   * @param events 原始时间线事件列表
+   * @param durationMs 分析持续时间
+   * @param targetFrameTimeMs 目标单帧耗时阈值
+   */
   private analyzeTimeline(
     events: TimelineEvent[],
     durationMs: number,
@@ -151,6 +184,9 @@ export class Profiler {
     };
   }
 
+  /**
+   * 判断给定名称是否属于渲染帧的相关事件
+   */
   private isFrameEvent(name: string): boolean {
     if (!name) return false;
     const n = name.toLowerCase();
@@ -168,6 +204,9 @@ export class Profiler {
     );
   }
 
+  /**
+   * 计算帧率表现及卡顿统计
+   */
   private analyzeFrames(
     events: TimelineEvent[],
     targetFrameTimeMs: number
@@ -232,6 +271,9 @@ export class Profiler {
     };
   }
 
+  /**
+   * 查找 CPU 执行热点，识别耗时较长的操作
+   */
   private findCpuHotspots(events: TimelineEvent[]): CpuHotspot[] {
     const eventMap = new Map<
       string,
@@ -276,6 +318,9 @@ export class Profiler {
       .slice(0, 20);
   }
 
+  /**
+   * 定义各个渲染阶段相关的事件名称模式
+   */
   private static readonly PHASE_PATTERNS: Record<string, string[]> = {
     Build: [
       "build", "widget", "createElement", "updateChild",
@@ -294,12 +339,18 @@ export class Profiler {
     ],
   };
 
+  /**
+   * 判断给定事件名称是否匹配指定的渲染阶段
+   */
   private matchesPhase(eventName: string, phaseName: string): boolean {
     const patterns = Profiler.PHASE_PATTERNS[phaseName] ?? [phaseName.toLowerCase()];
     const lower = eventName.toLowerCase();
     return patterns.some((p) => lower.includes(p));
   }
 
+  /**
+   * 针对特定的渲染阶段 (Build/Layout/Paint) 进行时间消耗分析
+   */
   private analyzePhase(
     events: TimelineEvent[],
     phaseName: string
@@ -356,6 +407,9 @@ export class Profiler {
     } as any;
   }
 
+  /**
+   * 根据各项指标生成文本形式的性能分析摘要
+   */
   private generateSummary(
     frames: FrameAnalysis,
     hotspots: CpuHotspot[],
@@ -403,6 +457,9 @@ export class Profiler {
     return summary;
   }
 
+  /**
+   * 根据各项分析数据生成具体的性能优化建议
+   */
   private generateRecommendations(
     frames: FrameAnalysis,
     hotspots: CpuHotspot[],

@@ -2,6 +2,11 @@ import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { FlutterVmServiceClient } from "../services/vm-service-client.js";
 
+/**
+ * 格式化字节大小为易读的字符串（B, KB, MB, GB）
+ * @param bytes 字节数
+ * @returns 格式化后的字符串
+ */
 function formatBytes(bytes: number): string {
   if (bytes === 0) return "0 B";
   const units = ["B", "KB", "MB", "GB"];
@@ -10,10 +15,17 @@ function formatBytes(bytes: number): string {
   return `${(bytes / Math.pow(k, i)).toFixed(2)} ${units[i]}`;
 }
 
+/**
+ * 注册与内存分析相关的 MCP 工具
+ * 包括获取当前内存快照信息
+ * @param server MCP 服务器实例
+ * @param client Flutter VM Service 客户端实例
+ */
 export function registerMemoryTools(
   server: McpServer,
   client: FlutterVmServiceClient
 ) {
+  // 注册 "get_memory_snapshot" 工具：获取运行中应用程序的内存分配快照
   server.registerTool("get_memory_snapshot", {
                 description: "Get a memory allocation profile of the running Flutter app. Shows heap usage, top memory-consuming classes, and potential leak indicators.",
     inputSchema: {

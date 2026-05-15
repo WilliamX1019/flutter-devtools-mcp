@@ -2,6 +2,9 @@ import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { FlutterVmServiceClient, AllocationProfile } from "../services/vm-service-client.js";
 
+/**
+ * 内存快照数据结构
+ */
 interface Snapshot {
   name: string;
   timestamp: number;
@@ -17,6 +20,11 @@ interface Snapshot {
   };
 }
 
+/**
+ * 格式化字节大小为易读的字符串，支持负数
+ * @param bytes 字节数
+ * @returns 格式化后的字符串
+ */
 function formatBytes(bytes: number): string {
   if (bytes === 0) return "0 B";
   const sign = bytes < 0 ? "-" : "";
@@ -27,6 +35,12 @@ function formatBytes(bytes: number): string {
   return `${sign}${(abs / Math.pow(k, i)).toFixed(2)} ${units[i]}`;
 }
 
+/**
+ * 计算百分比变化
+ * @param before 变化前数值
+ * @param after 变化后数值
+ * @returns 格式化后的百分比变化字符串
+ */
 function pctChange(before: number, after: number): string {
   if (before === 0) return after > 0 ? "+∞%" : "0%";
   const pct = ((after - before) / before) * 100;
@@ -34,12 +48,25 @@ function pctChange(before: number, after: number): string {
   return `${sign}${pct.toFixed(1)}%`;
 }
 
+/**
+ * 注册与内存快照对比相关的 MCP 工具
+ * 包括保存快照、比较快照、列出快照
+ * @param server MCP 服务器实例
+ * @param client Flutter VM Service 客户端实例
+ */
 export function registerSnapshotDiffTools(
   server: McpServer,
   client: FlutterVmServiceClient
 ) {
+  // 存储所有已保存的快照，Key 为快照名称
   const snapshots = new Map<string, Snapshot>();
 
+  /**
+   * 获取并记录一个命名内存快照
+   * @param name 快照名称
+   * @param gc 是否在获取快照前强制进行垃圾回收
+   * @returns 获取到的快照数据
+   */
   async function takeSnapshot(
     name: string,
     gc: boolean
@@ -68,6 +95,7 @@ export function registerSnapshotDiffTools(
     };
   }
 
+  // 注册 "save_snapshot" 工具：保存当前内存状态为一个命名快照
   server.registerTool("save_snapshot", {
                 description: "Save a named memory snapshot for later comparison. Take a snapshot before making a code change, then take another after to see the impact. Use compare_snapshots to see the diff.",
     inputSchema: {
@@ -129,6 +157,7 @@ export function registerSnapshotDiffTools(
           }
         });
 
+  // 注册 "compare_snapshots" 工具：对比两个已保存的快照并输出差异
   server.registerTool("compare_snapshots", {
                 description: "Compare two previously saved memory snapshots to see what changed. Shows heap usage diff, which classes grew or shrank, new allocations, and freed memory. Perfect for validating that a fix actually reduced memory usage.",
     inputSchema: {
@@ -294,6 +323,7 @@ export function registerSnapshotDiffTools(
           };
         });
 
+  // 注册 "list_snapshots" 工具：列出所有已保存的快照
   server.registerTool("list_snapshots", {
                 description: "List all saved memory snapshots available for comparison."
               }, async () => {

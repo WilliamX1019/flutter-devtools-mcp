@@ -2,6 +2,9 @@ import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { FlutterVmServiceClient } from "../services/vm-service-client.js";
 
+/**
+ * HTTP 请求数据记录接口
+ */
 interface HttpRequest {
   id: string;
   method: string;
@@ -15,6 +18,11 @@ interface HttpRequest {
   error?: string;
 }
 
+/**
+ * 格式化字节大小
+ * @param bytes 字节数
+ * @returns 易读格式的字符串
+ */
 function formatBytes(bytes: number): string {
   if (bytes === 0) return "0 B";
   const units = ["B", "KB", "MB"];
@@ -23,12 +31,22 @@ function formatBytes(bytes: number): string {
   return `${(bytes / Math.pow(k, i)).toFixed(1)} ${units[i]}`;
 }
 
+/**
+ * 格式化毫秒为时间字符串
+ * @param ms 毫秒数
+ * @returns 易读的时间字符串
+ */
 function formatDuration(ms: number): string {
   if (ms < 1) return "<1ms";
   if (ms < 1000) return `${Math.round(ms)}ms`;
   return `${(ms / 1000).toFixed(2)}s`;
 }
 
+/**
+ * 注册与网络流量抓包分析相关的 MCP 工具
+ * @param server MCP 服务器实例
+ * @param client Flutter VM Service 客户端实例
+ */
 export function registerNetworkTools(
   server: McpServer,
   client: FlutterVmServiceClient
@@ -99,6 +117,7 @@ export function registerNetworkTools(
     }
   };
 
+  // 注册 "start_network_capture" 工具：开启 HTTP 网络请求捕获
   server.registerTool("start_network_capture", {
                 description: "Start capturing HTTP network traffic from the running Flutter app. After starting, use the app to trigger API calls, then call stop_network_capture to see all requests with timing, status codes, and sizes."
               }, async () => {
@@ -154,6 +173,7 @@ export function registerNetworkTools(
           };
         });
 
+  // 注册 "stop_network_capture" 工具：停止 HTTP 捕获并输出汇总报告
   server.registerTool("stop_network_capture", {
                 description: "Stop capturing network traffic and get a detailed report of all HTTP requests including method, URL, status code, response time, and payload size.",
     inputSchema: {

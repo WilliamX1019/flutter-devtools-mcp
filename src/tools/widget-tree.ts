@@ -2,6 +2,9 @@ import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { FlutterVmServiceClient } from "../services/vm-service-client.js";
 
+/**
+ * 原始的 Widget 节点结构，对应于 Flutter 返回的 DiagnosticsNode
+ */
 interface WidgetNode {
   description?: string;
   type?: string;
@@ -23,6 +26,9 @@ interface WidgetNode {
   }>;
 }
 
+/**
+ * 扁平化后的 Widget 节点结构，用于格式化输出
+ */
 interface FlatWidget {
   type: string;
   depth: number;
@@ -34,6 +40,14 @@ interface FlatWidget {
   properties?: Array<{ name: string; value: string }>;
 }
 
+/**
+ * 递归展开并扁平化 Widget 树
+ * @param node 当前 Widget 节点
+ * @param depth 当前深度
+ * @param maxDepth 最大允许展开深度
+ * @param projectOnly 是否仅保留本地项目创建的 Widget
+ * @returns 扁平化的 Widget 列表
+ */
 function flattenWidgetTree(
   node: WidgetNode,
   depth: number = 0,
@@ -97,6 +111,11 @@ function flattenWidgetTree(
   return results;
 }
 
+/**
+ * 将扁平化的 Widget 列表格式化为易读的文本树结构
+ * @param widgets 扁平化的 Widget 列表
+ * @returns 格式化后的树状文本
+ */
 function formatTreeAsText(widgets: FlatWidget[]): string {
   return widgets
     .map((w) => {
@@ -117,10 +136,17 @@ function formatTreeAsText(widgets: FlatWidget[]): string {
     .join("\n");
 }
 
+/**
+ * 注册与 Widget 树视图相关的 MCP 工具
+ * 包括获取屏幕当前 Widget 树以及探测特定 Widget
+ * @param server MCP 服务器实例
+ * @param client Flutter VM Service 客户端实例
+ */
 export function registerWidgetTreeTools(
   server: McpServer,
   client: FlutterVmServiceClient
 ) {
+  // 注册 "get_widget_tree" 工具：获取当前 Flutter 应用程序页面的 Widget 树
   server.registerTool("get_widget_tree", {
                 description: "Get the current widget tree of the running Flutter app. Returns a structured representation of all widgets on screen. Widgets marked with ★ are from your project code (not framework widgets).",
     inputSchema: {
@@ -182,6 +208,7 @@ export function registerWidgetTreeTools(
           }
         });
 
+  // 注册 "inspect_widget" 工具：根据 widgetId 提取具体 Widget 的详细属性
   server.registerTool("inspect_widget", {
                 description: "Get detailed information about a specific widget by its ID (obtained from get_widget_tree). Returns render details, constraints, size, and state.",
     inputSchema: {

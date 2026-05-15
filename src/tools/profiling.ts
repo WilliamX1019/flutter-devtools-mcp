@@ -2,11 +2,19 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { FlutterVmServiceClient } from "../services/vm-service-client.js";
 import { Profiler } from "../services/profiler.js";
 
+/**
+ * 注册 Flutter 性能分析相关的 MCP 工具
+ * 包括启动和停止性能剖析会话
+ * @param server MCP 服务器实例
+ * @param client Flutter VM Service 客户端实例
+ * @param profiler Profiler 分析引擎实例
+ */
 export function registerProfilingTools(
   server: McpServer,
   client: FlutterVmServiceClient,
   profiler: Profiler
 ) {
+  // 注册 "start_profiling" 工具：启动性能剖析会话
   server.registerTool("start_profiling", {
                 description: "Start a performance profiling session. After starting, interact with the app (scroll, tap, navigate) to generate activity, then call stop_profiling to get the analysis. The app should be running in profile mode (`flutter run --profile`) for accurate results."
               }, async () => {
@@ -57,6 +65,7 @@ export function registerProfilingTools(
           }
         });
 
+  // 注册 "stop_profiling" 工具：停止当前的剖析会话，并生成性能分析报告
   server.registerTool("stop_profiling", {
                 description: "Stop the current profiling session and get a detailed performance analysis including frame timing, jank detection, CPU hotspots, build/layout/paint phase analysis, and actionable recommendations."
               }, async () => {

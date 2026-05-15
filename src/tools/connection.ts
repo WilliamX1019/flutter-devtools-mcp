@@ -2,10 +2,17 @@ import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { FlutterVmServiceClient } from "../services/vm-service-client.js";
 
+/**
+ * 注册与连接相关的 MCP 工具
+ * 包括：连接到 App、断开连接、获取 App 详情
+ * @param server MCP 服务器实例
+ * @param client Flutter VM Service 客户端实例
+ */
 export function registerConnectionTools(
   server: McpServer,
   client: FlutterVmServiceClient
 ) {
+  // 注册 "connect" 工具：连接到指定的 Flutter 应用程序
   server.registerTool("connect", {
                 description: "Connect to a running Flutter app via its VM Service URI. The URI is printed when you run `flutter run` (e.g., http://127.0.0.1:50000/xxxxx=/). You must connect before using any other tool.",
     inputSchema: {
@@ -17,6 +24,7 @@ export function registerConnectionTools(
         }
               }, async ({ vmServiceUri }) => {
           try {
+            // 尝试建立连接并获取 VM 信息
             const vmInfo = await client.connect(vmServiceUri);
             const mainIsolate = vmInfo.isolates.find((i) => !i.isSystemIsolate);
 
@@ -61,6 +69,7 @@ export function registerConnectionTools(
           }
         });
 
+  // 注册 "disconnect" 工具：断开当前连接
   server.registerTool("disconnect", {
                 description: "Disconnect from the currently connected Flutter app."
               }, async () => {
@@ -83,6 +92,7 @@ export function registerConnectionTools(
           };
         });
 
+  // 注册 "get_app_info" 工具：获取当前连接 App 的详细信息
   server.registerTool("get_app_info", {
                 description: "Get detailed information about the connected Flutter app including VM info, isolates, and available extensions."
               }, async () => {

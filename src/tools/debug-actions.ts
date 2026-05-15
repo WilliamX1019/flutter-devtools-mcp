@@ -2,10 +2,17 @@ import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { FlutterVmServiceClient } from "../services/vm-service-client.js";
 
+/**
+ * 注册 Flutter 调试操作相关的 MCP 工具
+ * 包括热重载、热重启、截图、开启调试边界、执行表达式等
+ * @param server MCP 服务器实例
+ * @param client Flutter VM Service 客户端实例
+ */
 export function registerDebugActionTools(
   server: McpServer,
   client: FlutterVmServiceClient
 ) {
+  // 注册 "hot_reload" 工具：触发 Flutter 热重载，不丢失状态地更新代码
   server.registerTool("hot_reload", {
                 description: "Trigger a hot reload on the running Flutter app. Injects updated source code without restarting the app or losing state."
               }, async () => {
@@ -44,6 +51,7 @@ export function registerDebugActionTools(
           }
         });
 
+  // 注册 "hot_restart" 工具：触发 Flutter 热重启，重新加载应用并丢失原有状态
   server.registerTool("hot_restart", {
                 description: "Trigger a hot restart on the running Flutter app. Restarts the app from scratch but is faster than a full rebuild."
               }, async () => {
@@ -82,6 +90,7 @@ export function registerDebugActionTools(
           }
         });
 
+  // 注册 "take_screenshot" 工具：截取当前 Flutter 应用的屏幕并返回 Base64
   server.registerTool("take_screenshot", {
                 description: "Capture a screenshot of the running Flutter app. Returns the screenshot as a base64-encoded PNG image."
               }, async () => {
@@ -136,6 +145,7 @@ export function registerDebugActionTools(
           }
         });
 
+  // 注册 "toggle_debug_paint" 工具：切换 UI 调试图层边界的显示
   server.registerTool("toggle_debug_paint", {
                 description: "Toggle the debug paint overlay on the Flutter app. Shows widget borders, padding, and alignment guides."
               }, async () => {
@@ -177,6 +187,7 @@ export function registerDebugActionTools(
           }
         });
 
+  // 注册 "evaluate_expression" 工具：在运行时的上下文中动态执行 Dart 表达式代码
   server.registerTool("evaluate_expression", {
                 description: "Evaluate a Dart expression in the context of the running Flutter app. Useful for inspecting runtime values, checking state, or running diagnostics.",
     inputSchema: {
