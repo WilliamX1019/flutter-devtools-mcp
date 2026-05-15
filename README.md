@@ -2,7 +2,7 @@
 
 **Give AI agents the power to inspect, profile, and debug your Flutter apps at runtime.**
 
-An MCP (Model Context Protocol) server that connects AI coding assistants like **Cursor**, **Claude Code**, **Windsurf**, and **GitHub Copilot** to running Flutter applications through the Dart VM Service Protocol.
+An MCP (Model Context Protocol) server that connects AI coding assistants like **Cursor**, **Claude Code**, **Windsurf**, **GitHub Copilot**, and **Codex** to running Flutter applications through the Dart VM Service Protocol.
 
 Instead of switching between your IDE and DevTools, just tell your AI assistant:
 
@@ -134,6 +134,23 @@ Add to your `.vscode/mcp.json`:
     }
   }
 }
+```
+
+#### Codex
+
+You can add the MCP server using the Codex CLI:
+
+```bash
+codex mcp add flutter-devtools -- node /path/to/flutter-devtools-mcp/dist/index.js
+```
+
+Or manually configure it by adding to your `~/.codex/config.toml` (or project-level `.codex/config.toml`):
+
+```toml
+[mcp_servers.flutter-devtools]
+command = "node"
+args = ["/path/to/flutter-devtools-mcp/dist/index.js"]
+enabled = true
 ```
 
 ### Usage

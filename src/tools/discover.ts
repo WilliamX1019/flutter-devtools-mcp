@@ -118,104 +118,102 @@ export function registerDiscoverTools(
   server: McpServer,
   client: FlutterVmServiceClient
 ) {
-  server.tool(
-    "discover_apps",
-    "Automatically discover running Flutter apps on this machine. Scans for Dart VM Service instances so you don't have to manually copy the URI. If an app is found, you can connect to it directly.",
-    {
-      autoConnect: z
-        .boolean()
-        .default(true)
-        .describe(
-          "Automatically connect to the first discovered app (default: true)"
-        ),
-    },
-    async ({ autoConnect }) => {
-      try {
-        const apps = await findFlutterProcesses();
-
-        if (apps.length === 0) {
-          return {
-            content: [
-              {
-                type: "text" as const,
-                text: "No running Flutter apps found.\n\nMake sure your app is running with:\n  flutter run\n  flutter run --profile\n\nThe VM Service URI is printed in the terminal when the app starts.",
-              },
-            ],
-          };
+  server.registerTool("discover_apps", {
+                description: "Automatically discover running Flutter apps on this machine. Scans for Dart VM Service instances so you don't have to manually copy the URI. If an app is found, you can connect to it directly.",
+    inputSchema: {
+          autoConnect: z
+            .boolean()
+            .default(true)
+            .describe(
+              "Automatically connect to the first discovered app (default: true)"
+            ),
         }
-
-        if (autoConnect && !client.connected) {
+              }, async ({ autoConnect }) => {
           try {
-            const vmInfo = await client.connect(apps[0].vmServiceUri);
-            const mainIsolate = vmInfo.isolates.find(
-              (i) => !i.isSystemIsolate
-            );
+            const apps = await findFlutterProcesses();
+
+            if (apps.length === 0) {
+              return {
+                content: [
+                  {
+                    type: "text" as const,
+                    text: "No running Flutter apps found.\n\nMake sure your app is running with:\n  flutter run\n  flutter run --profile\n\nThe VM Service URI is printed in the terminal when the app starts.",
+                  },
+                ],
+              };
+            }
+
+            if (autoConnect && !client.connected) {
+              try {
+                const vmInfo = await client.connect(apps[0].vmServiceUri);
+                const mainIsolate = vmInfo.isolates.find(
+                  (i) => !i.isSystemIsolate
+                );
+                return {
+                  content: [
+                    {
+                      type: "text" as const,
+                      text: [
+                        `Found ${apps.length} Flutter app(s). Auto-connected to:`,
+                        "",
+                        `  URI: ${apps[0].vmServiceUri}`,
+                        `  PID: ${apps[0].pid || "unknown"}`,
+                        `  VM: ${vmInfo.version}`,
+                        `  OS: ${vmInfo.operatingSystem}`,
+                        `  Isolate: ${mainIsolate?.name ?? "unknown"}`,
+                        "",
+                        apps.length > 1
+                          ? `Other apps found:\n${apps
+                              .slice(1)
+                              .map(
+                                (a) => `  • ${a.vmServiceUri} (PID: ${a.pid})`
+                              )
+                              .join("\n")}\n\nUse the \`connect\` tool to switch to a different app.`
+                          : "Ready to inspect.",
+                      ].join("\n"),
+                    },
+                  ],
+                };
+              } catch (err) {
+                return {
+                  content: [
+                    {
+                      type: "text" as const,
+                      text: `Found app at ${apps[0].vmServiceUri} but failed to connect: ${err instanceof Error ? err.message : String(err)}\n\nTry connecting manually with the \`connect\` tool.`,
+                    },
+                  ],
+                  isError: true,
+                };
+              }
+            }
+
             return {
               content: [
                 {
                   type: "text" as const,
                   text: [
-                    `Found ${apps.length} Flutter app(s). Auto-connected to:`,
+                    `Found ${apps.length} running Flutter app(s):`,
                     "",
-                    `  URI: ${apps[0].vmServiceUri}`,
-                    `  PID: ${apps[0].pid || "unknown"}`,
-                    `  VM: ${vmInfo.version}`,
-                    `  OS: ${vmInfo.operatingSystem}`,
-                    `  Isolate: ${mainIsolate?.name ?? "unknown"}`,
+                    ...apps.map(
+                      (a, i) =>
+                        `  ${i + 1}. ${a.vmServiceUri} (PID: ${a.pid || "unknown"}${a.platform ? `, ${a.platform}` : ""})`
+                    ),
                     "",
-                    apps.length > 1
-                      ? `Other apps found:\n${apps
-                          .slice(1)
-                          .map(
-                            (a) => `  • ${a.vmServiceUri} (PID: ${a.pid})`
-                          )
-                          .join("\n")}\n\nUse the \`connect\` tool to switch to a different app.`
-                      : "Ready to inspect.",
+                    "Use the `connect` tool with one of these URIs.",
                   ].join("\n"),
                 },
               ],
             };
-          } catch (err) {
+          } catch (error) {
             return {
               content: [
                 {
                   type: "text" as const,
-                  text: `Found app at ${apps[0].vmServiceUri} but failed to connect: ${err instanceof Error ? err.message : String(err)}\n\nTry connecting manually with the \`connect\` tool.`,
+                  text: `Failed to discover apps: ${error instanceof Error ? error.message : String(error)}`,
                 },
               ],
               isError: true,
             };
           }
-        }
-
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: [
-                `Found ${apps.length} running Flutter app(s):`,
-                "",
-                ...apps.map(
-                  (a, i) =>
-                    `  ${i + 1}. ${a.vmServiceUri} (PID: ${a.pid || "unknown"}${a.platform ? `, ${a.platform}` : ""})`
-                ),
-                "",
-                "Use the `connect` tool with one of these URIs.",
-              ].join("\n"),
-            },
-          ],
-        };
-      } catch (error) {
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: `Failed to discover apps: ${error instanceof Error ? error.message : String(error)}`,
-            },
-          ],
-          isError: true,
-        };
-      }
-    }
-  );
+        });
 }

@@ -121,111 +121,107 @@ export function registerWidgetTreeTools(
   server: McpServer,
   client: FlutterVmServiceClient
 ) {
-  server.tool(
-    "get_widget_tree",
-    "Get the current widget tree of the running Flutter app. Returns a structured representation of all widgets on screen. Widgets marked with ★ are from your project code (not framework widgets).",
-    {
-      maxDepth: z
-        .number()
-        .min(1)
-        .max(50)
-        .default(15)
-        .describe("Maximum depth of the widget tree to return (default: 15)"),
-      projectOnly: z
-        .boolean()
-        .default(false)
-        .describe(
-          "If true, only show widgets created by the project (skip framework internals)"
-        ),
-    },
-    async ({ maxDepth, projectOnly }) => {
-      if (!client.connected) {
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: "Not connected. Use the `connect` tool first.",
-            },
-          ],
-          isError: true,
-        };
-      }
+  server.registerTool("get_widget_tree", {
+                description: "Get the current widget tree of the running Flutter app. Returns a structured representation of all widgets on screen. Widgets marked with ★ are from your project code (not framework widgets).",
+    inputSchema: {
+          maxDepth: z
+            .number()
+            .min(1)
+            .max(50)
+            .default(15)
+            .describe("Maximum depth of the widget tree to return (default: 15)"),
+          projectOnly: z
+            .boolean()
+            .default(false)
+            .describe(
+              "If true, only show widgets created by the project (skip framework internals)"
+            ),
+        }
+              }, async ({ maxDepth, projectOnly }) => {
+          if (!client.connected) {
+            return {
+              content: [
+                {
+                  type: "text" as const,
+                  text: "Not connected. Use the `connect` tool first.",
+                },
+              ],
+              isError: true,
+            };
+          }
 
-      try {
-        const tree = (await client.getWidgetTree()) as WidgetNode;
-        const flattened = flattenWidgetTree(tree, 0, maxDepth, projectOnly);
-        const text = formatTreeAsText(flattened);
+          try {
+            const tree = (await client.getWidgetTree()) as WidgetNode;
+            const flattened = flattenWidgetTree(tree, 0, maxDepth, projectOnly);
+            const text = formatTreeAsText(flattened);
 
-        const stats = {
-          totalWidgets: flattened.length,
-          projectWidgets: flattened.filter((w) => w.isProjectWidget).length,
-          maxDepthReached: Math.max(...flattened.map((w) => w.depth)),
-        };
+            const stats = {
+              totalWidgets: flattened.length,
+              projectWidgets: flattened.filter((w) => w.isProjectWidget).length,
+              maxDepthReached: Math.max(...flattened.map((w) => w.depth)),
+            };
 
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: `Widget Tree (${stats.totalWidgets} widgets, ${stats.projectWidgets} from project, depth: ${stats.maxDepthReached})\n${"─".repeat(60)}\n${text}`,
-            },
-          ],
-        };
-      } catch (error) {
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: `Failed to get widget tree: ${error instanceof Error ? error.message : String(error)}`,
-            },
-          ],
-          isError: true,
-        };
-      }
-    }
-  );
+            return {
+              content: [
+                {
+                  type: "text" as const,
+                  text: `Widget Tree (${stats.totalWidgets} widgets, ${stats.projectWidgets} from project, depth: ${stats.maxDepthReached})\n${"─".repeat(60)}\n${text}`,
+                },
+              ],
+            };
+          } catch (error) {
+            return {
+              content: [
+                {
+                  type: "text" as const,
+                  text: `Failed to get widget tree: ${error instanceof Error ? error.message : String(error)}`,
+                },
+              ],
+              isError: true,
+            };
+          }
+        });
 
-  server.tool(
-    "inspect_widget",
-    "Get detailed information about a specific widget by its ID (obtained from get_widget_tree). Returns render details, constraints, size, and state.",
-    {
-      widgetId: z
-        .string()
-        .describe("The widget ID from the widget tree (valueId field)"),
-    },
-    async ({ widgetId }) => {
-      if (!client.connected) {
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: "Not connected. Use the `connect` tool first.",
-            },
-          ],
-          isError: true,
-        };
-      }
+  server.registerTool("inspect_widget", {
+                description: "Get detailed information about a specific widget by its ID (obtained from get_widget_tree). Returns render details, constraints, size, and state.",
+    inputSchema: {
+          widgetId: z
+            .string()
+            .describe("The widget ID from the widget tree (valueId field)"),
+        }
+              }, async ({ widgetId }) => {
+          if (!client.connected) {
+            return {
+              content: [
+                {
+                  type: "text" as const,
+                  text: "Not connected. Use the `connect` tool first.",
+                },
+              ],
+              isError: true,
+            };
+          }
 
-      try {
-        const details = await client.getWidgetDetails(widgetId);
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: JSON.stringify(details, null, 2),
-            },
-          ],
-        };
-      } catch (error) {
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: `Failed to inspect widget: ${error instanceof Error ? error.message : String(error)}`,
-            },
-          ],
-          isError: true,
-        };
-      }
-    }
-  );
+          try {
+            const details = await client.getWidgetDetails(widgetId);
+            return {
+              content: [
+                {
+                  type: "text" as const,
+                  text: JSON.stringify(details, null, 2),
+                },
+              ],
+            };
+          } catch (error) {
+            return {
+              content: [
+                {
+                  type: "text" as const,
+                  text: `Failed to inspect widget: ${error instanceof Error ? error.message : String(error)}`,
+                },
+              ],
+              isError: true,
+            };
+          }
+        });
 }
