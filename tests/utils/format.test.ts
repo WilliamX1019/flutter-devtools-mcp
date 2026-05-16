@@ -16,9 +16,7 @@ describe("formatBytes", () => {
   });
 
   it("supports precision and max unit options", () => {
-    expect(formatBytes(1024 * 1024 * 3, { decimals: 1, maxUnit: "MB" })).toBe(
-      "3.0 MB"
-    );
+    expect(formatBytes(1024 * 1024 * 3, { decimals: 1, maxUnit: "MB" })).toBe("3.0 MB");
     expect(formatBytes(1024 * 1024 * 3, { decimals: 1, maxUnit: "KB" })).toBe(
       "3072.0 KB"
     );

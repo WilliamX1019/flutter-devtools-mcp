@@ -68,9 +68,7 @@ vmClient.on("error", (err) => {
  * 监听 VM Service 断开连接事件
  */
 vmClient.on("disconnected", () => {
-  console.error(
-    "[flutter-devtools-mcp] Disconnected from Flutter app VM Service"
-  );
+  console.error("[flutter-devtools-mcp] Disconnected from Flutter app VM Service");
 });
 
 /**

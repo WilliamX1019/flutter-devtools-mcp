@@ -5,10 +5,7 @@ export interface FormatBytesOptions {
 
 const BYTE_UNITS = ["B", "KB", "MB", "GB"] as const;
 
-export function formatBytes(
-  bytes: number,
-  options: FormatBytesOptions = {}
-): string {
+export function formatBytes(bytes: number, options: FormatBytesOptions = {}): string {
   if (bytes === 0) return "0 B";
 
   const decimals = options.decimals ?? 2;
@@ -16,10 +13,7 @@ export function formatBytes(
   const maxUnitIndex = BYTE_UNITS.indexOf(maxUnit);
   const sign = bytes < 0 ? "-" : "";
   const abs = Math.abs(bytes);
-  const unitIndex = Math.min(
-    Math.floor(Math.log(abs) / Math.log(1024)),
-    maxUnitIndex
-  );
+  const unitIndex = Math.min(Math.floor(Math.log(abs) / Math.log(1024)), maxUnitIndex);
 
   return `${sign}${(abs / Math.pow(1024, unitIndex)).toFixed(decimals)} ${BYTE_UNITS[unitIndex]}`;
 }

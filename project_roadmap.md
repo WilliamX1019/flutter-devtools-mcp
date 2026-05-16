@@ -195,7 +195,7 @@ Agent 修改代码前应尽量先拿到运行时证据：
 
 #### Task 1.2 — 测试框架与核心单测
 
-- **状态**：进行中。已完成 Vitest 接入和 `src/utils/format.ts` 单测，后续补 Profiler 与 Widget 统计逻辑测试。
+- **状态**：已完成。
 - **目标**：为后续分析算法重构建立安全网。
 - **涉及文件**：
   - 新建 `vitest.config.ts`
@@ -208,17 +208,21 @@ Agent 修改代码前应尽量先拿到运行时证据：
 - **验收**：
   - 已通过 `npm test`。
   - 已通过 `npm run build`。
-  - 待补充 Profiler 纯分析逻辑测试。
+  - 已覆盖 `format.ts`、Widget 统计逻辑、Profiler Timeline 纯分析逻辑。
 
 #### Task 1.3 — Lint / Format 质量门禁
 
+- **状态**：已完成。
 - **目标**：减少后续多人/多 Agent 协作产生的风格漂移。
 - **实现要点**：
   - 增加 ESLint + Prettier。
   - 先以“不产生大规模无关格式化 diff”为原则。
   - `no-explicit-any` 可以分阶段收紧，先禁止新增明显 `any`。
 - **验收**：
-  - `npm run lint` 通过。
+  - 已通过 `npm run lint`。
+  - 已通过 `npm run format:check`。
+  - 已通过 `npm test`。
+  - 已通过 `npm run build`。
   - 不引入运行时依赖。
 
 ---
@@ -431,7 +435,7 @@ interface DiagnosticFinding {
 | 批次 | 优先级 | 任务 | 目标 |
 |------|--------|------|------|
 | Batch 1 | P0 | Task 1.1 | 已完成：抽取公共 format/type，清理 runtime_health_check 带来的重复 |
-| Batch 2 | P0 | Task 1.2 | 进行中：已加测试框架和 format 单测，待补 Profiler/Widget 统计测试 |
+| Batch 2 | P0 | Task 1.2 | 已完成：测试框架、format、Widget 统计、Profiler Timeline 分析单测 |
 | Batch 3 | P0 | Task 2.1 + Task 2.2 | 建立诊断会话和结构化 finding schema |
 | Batch 4 | P1 | Task 3.1 + Task 3.2 | 增加 MCP Resources 和 Prompts |
 | Batch 5 | P1 | Task 2.3 | 做 before/after 对比，形成验证闭环 |
@@ -442,9 +446,9 @@ interface DiagnosticFinding {
 
 ### 最近三步
 
-1. **继续 Task 1.2**：补 Profiler 纯分析逻辑和 Widget 统计逻辑测试。
-2. **再做 Task 1.3**：增加 lint/format 门禁，避免结构化输出阶段继续引入风格漂移。
-3. **然后做 Task 2.1 / 2.2**：诊断会话和结构化 finding 是 Agent 闭环的地基。
+1. **先做 Task 2.1 / 2.2**：诊断会话和结构化 finding 是 Agent 闭环的地基。
+2. **再做 Task 3.1 / 3.2**：通过 MCP Resources 和 Prompts 固化 Agent 工作流。
+3. **随后做 Task 2.3**：补 before/after 对比，让 Agent 能验证修复是否真的改善。
 
 ---
 

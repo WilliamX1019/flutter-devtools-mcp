@@ -167,9 +167,7 @@ export class FlutterVmServiceClient extends EventEmitter {
         try {
           const vmInfo = (await this.callMethod("getVM")) as VMInfo;
           // 查找非系统 Isolate，通常第一个即为 Flutter 的主 Isolate
-          const flutterIsolate = vmInfo.isolates.find(
-            (i) => !i.isSystemIsolate
-          );
+          const flutterIsolate = vmInfo.isolates.find((i) => !i.isSystemIsolate);
           if (flutterIsolate) {
             this._mainIsolateId = flutterIsolate.id;
           }
@@ -220,10 +218,7 @@ export class FlutterVmServiceClient extends EventEmitter {
    * @param params 附加参数
    * @returns 方法执行结果
    */
-  async callMethod(
-    method: string,
-    params?: Record<string, unknown>
-  ): Promise<unknown> {
+  async callMethod(method: string, params?: Record<string, unknown>): Promise<unknown> {
     if (!this.ws || !this._connected) {
       throw new Error("Not connected to VM Service");
     }
@@ -325,10 +320,7 @@ export class FlutterVmServiceClient extends EventEmitter {
    * @param maxDepth 最大遍历深度，默认 20
    * @returns 包含 Widget 树结构的对象
    */
-  async getWidgetTree(
-    isolateId?: string,
-    maxDepth: number = 20
-  ): Promise<unknown> {
+  async getWidgetTree(isolateId?: string, maxDepth: number = 20): Promise<unknown> {
     const id = isolateId ?? this._mainIsolateId;
     if (!id) throw new Error("No isolate ID available");
 
@@ -414,10 +406,7 @@ export class FlutterVmServiceClient extends EventEmitter {
    * @param isolateId Isolate ID
    * @returns 包含 Widget 属性细节的对象
    */
-  async getWidgetDetails(
-    widgetId: string,
-    isolateId?: string
-  ): Promise<unknown> {
+  async getWidgetDetails(widgetId: string, isolateId?: string): Promise<unknown> {
     const id = isolateId ?? this._mainIsolateId;
     if (!id) throw new Error("No isolate ID available");
 
@@ -459,10 +448,8 @@ export class FlutterVmServiceClient extends EventEmitter {
     timeExtentMicros?: number
   ): Promise<{ traceEvents: TimelineEvent[] }> {
     const params: Record<string, unknown> = {};
-    if (timeOriginMicros !== undefined)
-      params.timeOriginMicros = timeOriginMicros;
-    if (timeExtentMicros !== undefined)
-      params.timeExtentMicros = timeExtentMicros;
+    if (timeOriginMicros !== undefined) params.timeOriginMicros = timeOriginMicros;
+    if (timeExtentMicros !== undefined) params.timeExtentMicros = timeExtentMicros;
     return (await this.callMethod("getVMTimeline", params)) as {
       traceEvents: TimelineEvent[];
     };
@@ -491,10 +478,7 @@ export class FlutterVmServiceClient extends EventEmitter {
     const params: Record<string, unknown> = { isolateId: id };
     if (gc) params.gc = true;
 
-    return (await this.callMethod(
-      "getAllocationProfile",
-      params
-    )) as AllocationProfile;
+    return (await this.callMethod("getAllocationProfile", params)) as AllocationProfile;
   }
 
   /**
@@ -520,10 +504,9 @@ export class FlutterVmServiceClient extends EventEmitter {
     const id = isolateId ?? this._mainIsolateId;
     if (!id) throw new Error("No isolate ID available");
 
-    const current = (await this.callServiceExtension(
-      "ext.flutter.debugPaint",
-      id
-    )) as { enabled?: boolean };
+    const current = (await this.callServiceExtension("ext.flutter.debugPaint", id)) as {
+      enabled?: boolean;
+    };
 
     return this.callServiceExtension("ext.flutter.debugPaint", id, {
       enabled: !current.enabled,
@@ -534,11 +517,9 @@ export class FlutterVmServiceClient extends EventEmitter {
    * 截取当前 App 屏幕画面
    */
   async screenshot(): Promise<unknown> {
-    return this.callServiceExtension(
-      "ext.flutter.debugAllowBanner",
-      undefined,
-      { enabled: false }
-    )
+    return this.callServiceExtension("ext.flutter.debugAllowBanner", undefined, {
+      enabled: false,
+    })
       .catch(() => {})
       .then(() => this.callServiceExtension("_flutter.screenshot"));
   }
@@ -643,9 +624,7 @@ export class FlutterVmServiceClient extends EventEmitter {
         const response = message as JsonRpcResponse;
         if (response.error) {
           pending.reject(
-            new Error(
-              `${response.error.message} (code: ${response.error.code})`
-            )
+            new Error(`${response.error.message} (code: ${response.error.code})`)
           );
         } else {
           pending.resolve(response.result);
@@ -655,10 +634,7 @@ export class FlutterVmServiceClient extends EventEmitter {
       this.emit("event", message);
       const notification = message as JsonRpcNotification;
       if (notification.params?.streamId) {
-        this.emit(
-          `stream:${notification.params.streamId}`,
-          notification.params.event
-        );
+        this.emit(`stream:${notification.params.streamId}`, notification.params.event);
       }
     }
   }

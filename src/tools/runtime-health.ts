@@ -7,79 +7,11 @@ import {
 import { IsolateInfo } from "../types/runtime.js";
 import { WidgetNode } from "../types/widget.js";
 import { formatBytes } from "../utils/format.js";
-
-interface WidgetStats {
-  totalWidgets: number;
-  projectWidgets: number;
-  unresolvedChildren: number;
-  deepestLevel: number;
-  topProjectWidgets: Array<{
-    name: string;
-    location?: string;
-  }>;
-}
-
-function getWidgetName(node: WidgetNode): string {
-  return (
-    node.creationLocation?.name ??
-    node.widgetRuntimeType ??
-    node.description ??
-    node.type ??
-    "Unknown"
-  );
-}
-
-function shortLocation(node: WidgetNode): string | undefined {
-  const file = node.creationLocation?.file;
-  const line = node.creationLocation?.line;
-  if (!file) return undefined;
-
-  const normalized = file.replace(/^file:\/\//, "");
-  const shortFile =
-    normalized.split("/lib/").pop() ?? normalized.split("/").pop() ?? normalized;
-  return line ? `${shortFile}:${line}` : shortFile;
-}
-
-function collectWidgetStats(root: WidgetNode): WidgetStats {
-  const stats: WidgetStats = {
-    totalWidgets: 0,
-    projectWidgets: 0,
-    unresolvedChildren: 0,
-    deepestLevel: 0,
-    topProjectWidgets: [],
-  };
-
-  const visit = (node: WidgetNode, depth: number) => {
-    stats.totalWidgets += 1;
-    stats.deepestLevel = Math.max(stats.deepestLevel, depth);
-
-    if (node.createdByLocalProject) {
-      stats.projectWidgets += 1;
-      if (stats.topProjectWidgets.length < 10) {
-        stats.topProjectWidgets.push({
-          name: getWidgetName(node),
-          location: shortLocation(node),
-        });
-      }
-    }
-
-    if (node.hasChildren && (!node.children || node.children.length === 0)) {
-      stats.unresolvedChildren += 1;
-    }
-
-    for (const child of node.children ?? []) {
-      visit(child, depth + 1);
-    }
-  };
-
-  visit(root, 0);
-  return stats;
-}
+import { collectWidgetStats, WidgetStats } from "../utils/widget-stats.js";
 
 function summarizeMemory(profile: AllocationProfile) {
   const { heapUsage, heapCapacity, externalUsage } = profile.memoryUsage;
-  const heapUtilization =
-    heapCapacity > 0 ? (heapUsage / heapCapacity) * 100 : 0;
+  const heapUtilization = heapCapacity > 0 ? (heapUsage / heapCapacity) * 100 : 0;
 
   const topClasses = profile.members
     .filter((m) => m.class?.name && m.bytesCurrent > 0)
@@ -218,9 +150,7 @@ export function registerRuntimeHealthTools(
         const pauseState = isolate.pauseEvent?.kind ?? "unknown";
 
         let widgetStats: WidgetStats | undefined;
-        let memorySummary:
-          | ReturnType<typeof summarizeMemory>
-          | undefined;
+        let memorySummary: ReturnType<typeof summarizeMemory> | undefined;
 
         if (mode === "deep" || extStatus.inspector) {
           try {
@@ -236,10 +166,7 @@ export function registerRuntimeHealthTools(
 
         if (mode === "deep") {
           try {
-            const profile = await client.getAllocationProfile(
-              undefined,
-              forceGC
-            );
+            const profile = await client.getAllocationProfile(undefined, forceGC);
             memorySummary = summarizeMemory(profile);
           } catch {
             memorySummary = undefined;

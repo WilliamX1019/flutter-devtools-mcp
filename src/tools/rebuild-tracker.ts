@@ -6,7 +6,10 @@ import { FlutterVmServiceClient } from "../services/vm-service-client.js";
  * 重建事件数据结构，反映来自 Flutter Framework 的重建通知
  */
 interface RebuildEvent {
-  locations: Record<string, { file: string; line: number; column: number; name: string }>;
+  locations: Record<
+    string,
+    { file: string; line: number; column: number; name: string }
+  >;
   events: Array<number>;
 }
 
@@ -48,277 +51,277 @@ export function registerRebuildTrackerTools(
         for (let i = 0; i < data.events.length; i += 2) {
           const locationId = data.events[i];
           const count = data.events[i + 1];
-          rebuildCounts.set(
-            locationId,
-            (rebuildCounts.get(locationId) ?? 0) + count
-          );
+          rebuildCounts.set(locationId, (rebuildCounts.get(locationId) ?? 0) + count);
         }
       }
     }
   };
 
   // 注册 "start_tracking_rebuilds" 工具：启动重建跟踪器收集状态变化导致的重建事件
-  server.registerTool("start_tracking_rebuilds", {
-                description: "Start tracking which widgets are rebuilding and how often. After starting, interact with the app, then call stop_tracking_rebuilds to see exactly which widgets rebuilt, how many times, and where they are in your code. This is the most effective way to find unnecessary rebuilds."
-              }, async () => {
-          if (!client.connected) {
-            return {
-              content: [
-                {
-                  type: "text" as const,
-                  text: "Not connected. Use the `connect` tool first.",
-                },
-              ],
-              isError: true,
-            };
+  server.registerTool(
+    "start_tracking_rebuilds",
+    {
+      description:
+        "Start tracking which widgets are rebuilding and how often. After starting, interact with the app, then call stop_tracking_rebuilds to see exactly which widgets rebuilt, how many times, and where they are in your code. This is the most effective way to find unnecessary rebuilds.",
+    },
+    async () => {
+      if (!client.connected) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: "Not connected. Use the `connect` tool first.",
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      if (tracking) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: "Already tracking rebuilds. Call stop_tracking_rebuilds first.",
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      try {
+        rebuildCounts = new Map();
+        locationMap = {};
+
+        try {
+          const existingMap = (await client.getWidgetLocationMap()) as Record<
+            string,
+            { file: string; line: number; column: number; name: string }
+          >;
+          if (existingMap && typeof existingMap === "object") {
+            Object.assign(locationMap, existingMap);
           }
+        } catch {
+          // Location map may not be available yet
+        }
 
-          if (tracking) {
-            return {
-              content: [
-                {
-                  type: "text" as const,
-                  text: "Already tracking rebuilds. Call stop_tracking_rebuilds first.",
-                },
-              ],
-              isError: true,
-            };
-          }
+        client.on("stream:Extension", rebuildListener);
+        await client.startTrackingRebuilds();
+        tracking = true;
+        trackingStartTime = Date.now();
 
-          try {
-            rebuildCounts = new Map();
-            locationMap = {};
-
-            try {
-              const existingMap = (await client.getWidgetLocationMap()) as Record<
-                string,
-                { file: string; line: number; column: number; name: string }
-              >;
-              if (existingMap && typeof existingMap === "object") {
-                Object.assign(locationMap, existingMap);
-              }
-            } catch {
-              // Location map may not be available yet
-            }
-
-            client.on("stream:Extension", rebuildListener);
-            await client.startTrackingRebuilds();
-            tracking = true;
-            trackingStartTime = Date.now();
-
-            return {
-              content: [
-                {
-                  type: "text" as const,
-                  text: "✅ Rebuild tracking started. Interact with the app now (scroll, tap, navigate between screens), then call `stop_tracking_rebuilds` to see which widgets rebuilt and how many times.",
-                },
-              ],
-            };
-          } catch (error) {
-            return {
-              content: [
-                {
-                  type: "text" as const,
-                  text: `Failed to start rebuild tracking: ${error instanceof Error ? error.message : String(error)}`,
-                },
-              ],
-              isError: true,
-            };
-          }
-        });
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: "✅ Rebuild tracking started. Interact with the app now (scroll, tap, navigate between screens), then call `stop_tracking_rebuilds` to see which widgets rebuilt and how many times.",
+            },
+          ],
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `Failed to start rebuild tracking: ${error instanceof Error ? error.message : String(error)}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+    }
+  );
 
   // 注册 "stop_tracking_rebuilds" 工具：停止收集并输出重建统计分析报告
-  server.registerTool("stop_tracking_rebuilds", {
-                description: "Stop tracking widget rebuilds and get a detailed report showing exactly which widgets rebuilt, how many times, and their source file locations. Sorted by rebuild count to highlight the most problematic widgets.",
-    inputSchema: {
-          topN: z
-            .number()
-            .min(5)
-            .max(100)
-            .default(30)
-            .describe("Number of top rebuilding widgets to show"),
+  server.registerTool(
+    "stop_tracking_rebuilds",
+    {
+      description:
+        "Stop tracking widget rebuilds and get a detailed report showing exactly which widgets rebuilt, how many times, and their source file locations. Sorted by rebuild count to highlight the most problematic widgets.",
+      inputSchema: {
+        topN: z
+          .number()
+          .min(5)
+          .max(100)
+          .default(30)
+          .describe("Number of top rebuilding widgets to show"),
+      },
+    },
+    async ({ topN }) => {
+      if (!client.connected) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: "Not connected. Use the `connect` tool first.",
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      if (!tracking) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: "Not tracking rebuilds. Call start_tracking_rebuilds first.",
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      try {
+        await client.stopTrackingRebuilds();
+        client.off("stream:Extension", rebuildListener);
+        tracking = false;
+
+        const durationMs = Date.now() - trackingStartTime;
+
+        try {
+          const freshMap = (await client.getWidgetLocationMap()) as Record<
+            string,
+            { file: string; line: number; column: number; name: string }
+          >;
+          if (freshMap && typeof freshMap === "object") {
+            Object.assign(locationMap, freshMap);
+          }
+        } catch {
+          // Best effort
         }
-              }, async ({ topN }) => {
-          if (!client.connected) {
-            return {
-              content: [
-                {
-                  type: "text" as const,
-                  text: "Not connected. Use the `connect` tool first.",
-                },
-              ],
-              isError: true,
-            };
+
+        const entries: RebuildEntry[] = [];
+        let totalRebuilds = 0;
+
+        for (const [locationId, count] of rebuildCounts) {
+          totalRebuilds += count;
+          const loc = locationMap[String(locationId)];
+          if (loc) {
+            const file =
+              loc.file
+                .replace(/^file:\/\//, "")
+                .split("/lib/")
+                .pop() ??
+              loc.file.split("/").pop() ??
+              loc.file;
+            entries.push({
+              widgetName: loc.name,
+              file,
+              line: loc.line,
+              rebuildCount: count,
+            });
+          } else {
+            entries.push({
+              widgetName: `Unknown (location ${locationId})`,
+              file: "unknown",
+              line: 0,
+              rebuildCount: count,
+            });
+          }
+        }
+
+        entries.sort((a, b) => b.rebuildCount - a.rebuildCount);
+
+        const uniqueWidgets = entries.length;
+        const durationSec = (durationMs / 1000).toFixed(1);
+
+        const output = [
+          "═══════════════════════════════════════════════════════════",
+          "  WIDGET REBUILD REPORT",
+          "═══════════════════════════════════════════════════════════",
+          "",
+          "📊 SUMMARY",
+          "───────────────────────────────────────────────────────────",
+          `Tracked for ${durationSec}s`,
+          `Total rebuilds: ${totalRebuilds.toLocaleString()}`,
+          `Unique widgets rebuilt: ${uniqueWidgets}`,
+          `Average rebuilds per widget: ${uniqueWidgets > 0 ? (totalRebuilds / uniqueWidgets).toFixed(1) : "0"}`,
+          "",
+        ];
+
+        if (entries.length === 0) {
+          output.push(
+            "No rebuilds captured. Make sure you interacted with the app while tracking."
+          );
+        } else {
+          output.push(`🔥 TOP ${Math.min(topN, entries.length)} REBUILDING WIDGETS`);
+          output.push("───────────────────────────────────────────────────────────");
+
+          for (const entry of entries.slice(0, topN)) {
+            const severity =
+              entry.rebuildCount > 100
+                ? "🔴"
+                : entry.rebuildCount > 30
+                  ? "🟠"
+                  : entry.rebuildCount > 10
+                    ? "🟡"
+                    : "🟢";
+            output.push(
+              `${severity} ${entry.rebuildCount.toLocaleString().padStart(6)}x | ${entry.widgetName} [${entry.file}:${entry.line}]`
+            );
           }
 
-          if (!tracking) {
-            return {
-              content: [
-                {
-                  type: "text" as const,
-                  text: "Not tracking rebuilds. Call start_tracking_rebuilds first.",
-                },
-              ],
-              isError: true,
-            };
-          }
+          const excessiveRebuilds = entries.filter((e) => e.rebuildCount > 50);
+          if (excessiveRebuilds.length > 0) {
+            output.push("");
+            output.push("💡 RECOMMENDATIONS");
+            output.push("───────────────────────────────────────────────────────────");
 
-          try {
-            await client.stopTrackingRebuilds();
-            client.off("stream:Extension", rebuildListener);
-            tracking = false;
+            for (const entry of excessiveRebuilds.slice(0, 5)) {
+              output.push(
+                `• ${entry.widgetName} rebuilt ${entry.rebuildCount}x [${entry.file}:${entry.line}]`
+              );
 
-            const durationMs = Date.now() - trackingStartTime;
-
-            try {
-              const freshMap = (await client.getWidgetLocationMap()) as Record<
-                string,
-                { file: string; line: number; column: number; name: string }
-              >;
-              if (freshMap && typeof freshMap === "object") {
-                Object.assign(locationMap, freshMap);
-              }
-            } catch {
-              // Best effort
-            }
-
-            const entries: RebuildEntry[] = [];
-            let totalRebuilds = 0;
-
-            for (const [locationId, count] of rebuildCounts) {
-              totalRebuilds += count;
-              const loc = locationMap[String(locationId)];
-              if (loc) {
-                const file = loc.file
-                  .replace(/^file:\/\//, "")
-                  .split("/lib/")
-                  .pop() ?? loc.file.split("/").pop() ?? loc.file;
-                entries.push({
-                  widgetName: loc.name,
-                  file,
-                  line: loc.line,
-                  rebuildCount: count,
-                });
+              if (entry.rebuildCount > 100) {
+                output.push(
+                  `  → This widget is rebuilding excessively. Check if it depends on a`
+                );
+                output.push(
+                  `    Provider/InheritedWidget that changes too frequently. Consider`
+                );
+                output.push(
+                  `    using context.select() instead of context.watch() or adding`
+                );
+                output.push(`    a const constructor.`);
               } else {
-                entries.push({
-                  widgetName: `Unknown (location ${locationId})`,
-                  file: "unknown",
-                  line: 0,
-                  rebuildCount: count,
-                });
+                output.push(
+                  `  → Consider wrapping in a const constructor or extracting into`
+                );
+                output.push(`    a separate widget to limit rebuild scope.`);
               }
             }
-
-            entries.sort((a, b) => b.rebuildCount - a.rebuildCount);
-
-            const uniqueWidgets = entries.length;
-            const durationSec = (durationMs / 1000).toFixed(1);
-
-            const output = [
-              "═══════════════════════════════════════════════════════════",
-              "  WIDGET REBUILD REPORT",
-              "═══════════════════════════════════════════════════════════",
-              "",
-              "📊 SUMMARY",
-              "───────────────────────────────────────────────────────────",
-              `Tracked for ${durationSec}s`,
-              `Total rebuilds: ${totalRebuilds.toLocaleString()}`,
-              `Unique widgets rebuilt: ${uniqueWidgets}`,
-              `Average rebuilds per widget: ${uniqueWidgets > 0 ? (totalRebuilds / uniqueWidgets).toFixed(1) : "0"}`,
-              "",
-            ];
-
-            if (entries.length === 0) {
-              output.push(
-                "No rebuilds captured. Make sure you interacted with the app while tracking."
-              );
-            } else {
-              output.push(
-                `🔥 TOP ${Math.min(topN, entries.length)} REBUILDING WIDGETS`
-              );
-              output.push(
-                "───────────────────────────────────────────────────────────"
-              );
-
-              for (const entry of entries.slice(0, topN)) {
-                const severity =
-                  entry.rebuildCount > 100
-                    ? "🔴"
-                    : entry.rebuildCount > 30
-                      ? "🟠"
-                      : entry.rebuildCount > 10
-                        ? "🟡"
-                        : "🟢";
-                output.push(
-                  `${severity} ${entry.rebuildCount.toLocaleString().padStart(6)}x | ${entry.widgetName} [${entry.file}:${entry.line}]`
-                );
-              }
-
-              const excessiveRebuilds = entries.filter(
-                (e) => e.rebuildCount > 50
-              );
-              if (excessiveRebuilds.length > 0) {
-                output.push("");
-                output.push("💡 RECOMMENDATIONS");
-                output.push(
-                  "───────────────────────────────────────────────────────────"
-                );
-
-                for (const entry of excessiveRebuilds.slice(0, 5)) {
-                  output.push(
-                    `• ${entry.widgetName} rebuilt ${entry.rebuildCount}x [${entry.file}:${entry.line}]`
-                  );
-
-                  if (entry.rebuildCount > 100) {
-                    output.push(
-                      `  → This widget is rebuilding excessively. Check if it depends on a`
-                    );
-                    output.push(
-                      `    Provider/InheritedWidget that changes too frequently. Consider`
-                    );
-                    output.push(
-                      `    using context.select() instead of context.watch() or adding`
-                    );
-                    output.push(`    a const constructor.`);
-                  } else {
-                    output.push(
-                      `  → Consider wrapping in a const constructor or extracting into`
-                    );
-                    output.push(
-                      `    a separate widget to limit rebuild scope.`
-                    );
-                  }
-                }
-              }
-
-              if (excessiveRebuilds.length === 0) {
-                output.push("");
-                output.push(
-                  "✅ No excessive rebuilds detected. Widget rebuild counts look healthy."
-                );
-              }
-            }
-
-            return {
-              content: [
-                {
-                  type: "text" as const,
-                  text: output.join("\n"),
-                },
-              ],
-            };
-          } catch (error) {
-            tracking = false;
-            client.off("stream:Extension", rebuildListener);
-            return {
-              content: [
-                {
-                  type: "text" as const,
-                  text: `Failed to stop rebuild tracking: ${error instanceof Error ? error.message : String(error)}`,
-                },
-              ],
-              isError: true,
-            };
           }
-        });
+
+          if (excessiveRebuilds.length === 0) {
+            output.push("");
+            output.push(
+              "✅ No excessive rebuilds detected. Widget rebuild counts look healthy."
+            );
+          }
+        }
+
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: output.join("\n"),
+            },
+          ],
+        };
+      } catch (error) {
+        tracking = false;
+        client.off("stream:Extension", rebuildListener);
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `Failed to stop rebuild tracking: ${error instanceof Error ? error.message : String(error)}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+    }
+  );
 }
