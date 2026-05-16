@@ -1,6 +1,10 @@
 import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { FlutterVmServiceClient } from "../services/vm-service-client.js";
+import {
+  formatBytes as formatReadableBytes,
+  formatDuration,
+} from "../utils/format.js";
 
 /**
  * HTTP 请求数据记录接口
@@ -18,29 +22,8 @@ interface HttpRequest {
   error?: string;
 }
 
-/**
- * 格式化字节大小
- * @param bytes 字节数
- * @returns 易读格式的字符串
- */
-function formatBytes(bytes: number): string {
-  if (bytes === 0) return "0 B";
-  const units = ["B", "KB", "MB"];
-  const k = 1024;
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return `${(bytes / Math.pow(k, i)).toFixed(1)} ${units[i]}`;
-}
-
-/**
- * 格式化毫秒为时间字符串
- * @param ms 毫秒数
- * @returns 易读的时间字符串
- */
-function formatDuration(ms: number): string {
-  if (ms < 1) return "<1ms";
-  if (ms < 1000) return `${Math.round(ms)}ms`;
-  return `${(ms / 1000).toFixed(2)}s`;
-}
+const formatBytes = (bytes: number): string =>
+  formatReadableBytes(bytes, { decimals: 1, maxUnit: "MB" });
 
 /**
  * 注册与网络流量抓包分析相关的 MCP 工具

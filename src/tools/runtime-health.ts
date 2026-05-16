@@ -4,20 +4,9 @@ import {
   AllocationProfile,
   FlutterVmServiceClient,
 } from "../services/vm-service-client.js";
-
-interface WidgetNode {
-  description?: string;
-  type?: string;
-  widgetRuntimeType?: string;
-  children?: WidgetNode[];
-  createdByLocalProject?: boolean;
-  hasChildren?: boolean;
-  creationLocation?: {
-    file?: string;
-    line?: number;
-    name?: string;
-  };
-}
+import { IsolateInfo } from "../types/runtime.js";
+import { WidgetNode } from "../types/widget.js";
+import { formatBytes } from "../utils/format.js";
 
 interface WidgetStats {
   totalWidgets: number;
@@ -28,21 +17,6 @@ interface WidgetStats {
     name: string;
     location?: string;
   }>;
-}
-
-interface IsolateInfo {
-  rootLib?: { uri: string };
-  libraries?: Array<{ uri: string }>;
-  extensionRPCs?: string[];
-  pauseEvent?: { kind: string };
-}
-
-function formatBytes(bytes: number): string {
-  if (bytes === 0) return "0 B";
-  const units = ["B", "KB", "MB", "GB"];
-  const k = 1024;
-  const i = Math.min(Math.floor(Math.log(bytes) / Math.log(k)), units.length - 1);
-  return `${(bytes / Math.pow(k, i)).toFixed(2)} ${units[i]}`;
 }
 
 function getWidgetName(node: WidgetNode): string {

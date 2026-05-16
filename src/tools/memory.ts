@@ -1,19 +1,7 @@
 import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { FlutterVmServiceClient } from "../services/vm-service-client.js";
-
-/**
- * 格式化字节大小为易读的字符串（B, KB, MB, GB）
- * @param bytes 字节数
- * @returns 格式化后的字符串
- */
-function formatBytes(bytes: number): string {
-  if (bytes === 0) return "0 B";
-  const units = ["B", "KB", "MB", "GB"];
-  const k = 1024;
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return `${(bytes / Math.pow(k, i)).toFixed(2)} ${units[i]}`;
-}
+import { formatBytes } from "../utils/format.js";
 
 /**
  * 注册与内存分析相关的 MCP 工具

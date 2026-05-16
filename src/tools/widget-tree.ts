@@ -1,44 +1,7 @@
 import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { FlutterVmServiceClient } from "../services/vm-service-client.js";
-
-/**
- * 原始的 Widget 节点结构，对应于 Flutter 返回的 DiagnosticsNode
- */
-interface WidgetNode {
-  description?: string;
-  type?: string;
-  widgetRuntimeType?: string;
-  children?: WidgetNode[];
-  valueId?: string;
-  createdByLocalProject?: boolean;
-  hasChildren?: boolean;
-  creationLocation?: {
-    file?: string;
-    line?: number;
-    column?: number;
-    name?: string;
-  };
-  properties?: Array<{
-    name: string;
-    description?: string;
-    value?: unknown;
-  }>;
-}
-
-/**
- * 扁平化后的 Widget 节点结构，用于格式化输出
- */
-interface FlatWidget {
-  type: string;
-  depth: number;
-  id?: string;
-  isProjectWidget: boolean;
-  childCount: number;
-  sourceFile?: string;
-  sourceLine?: number;
-  properties?: Array<{ name: string; value: string }>;
-}
+import { FlatWidget, WidgetNode } from "../types/widget.js";
 
 /**
  * 递归展开并扁平化 Widget 树

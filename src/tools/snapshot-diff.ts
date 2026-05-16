@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { FlutterVmServiceClient, AllocationProfile } from "../services/vm-service-client.js";
+import { formatBytes, pctChange } from "../utils/format.js";
 
 /**
  * 内存快照数据结构
@@ -18,34 +19,6 @@ interface Snapshot {
       instances: number;
     }>;
   };
-}
-
-/**
- * 格式化字节大小为易读的字符串，支持负数
- * @param bytes 字节数
- * @returns 格式化后的字符串
- */
-function formatBytes(bytes: number): string {
-  if (bytes === 0) return "0 B";
-  const sign = bytes < 0 ? "-" : "";
-  const abs = Math.abs(bytes);
-  const units = ["B", "KB", "MB", "GB"];
-  const k = 1024;
-  const i = Math.floor(Math.log(abs) / Math.log(k));
-  return `${sign}${(abs / Math.pow(k, i)).toFixed(2)} ${units[i]}`;
-}
-
-/**
- * 计算百分比变化
- * @param before 变化前数值
- * @param after 变化后数值
- * @returns 格式化后的百分比变化字符串
- */
-function pctChange(before: number, after: number): string {
-  if (before === 0) return after > 0 ? "+∞%" : "0%";
-  const pct = ((after - before) / before) * 100;
-  const sign = pct > 0 ? "+" : "";
-  return `${sign}${pct.toFixed(1)}%`;
 }
 
 /**
