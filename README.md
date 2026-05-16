@@ -169,9 +169,17 @@ Or connect manually with the VM Service URI printed in the terminal:
 
 > "Connect to my Flutter app at http://127.0.0.1:50000/AbCdEf=/"
 
-3. **Start inspecting:**
+3. **Create a runtime baseline first:**
 
-> "Show me the widget tree"
+> "Run a Flutter runtime health check"
+
+This gives the agent a compact view of VM state, available Flutter service
+extensions, shallow widget coverage, memory pressure, and the best next tools
+to call.
+
+4. **Start targeted diagnostics:**
+
+> "Show me the widget tree for project widgets"
 
 > "Track widget rebuilds while I scroll through the list"
 
@@ -181,7 +189,11 @@ Or connect manually with the VM Service URI printed in the terminal:
 
 > "Capture network traffic while I pull to refresh"
 
-## Tools Reference (21 tools)
+5. **Verify the fix after editing:**
+
+> "Hot reload, then rerun the same diagnostic check and compare with the baseline"
+
+## Tools Reference (22 tools)
 
 ### Discovery & Connection
 | Tool | Description |
@@ -190,6 +202,7 @@ Or connect manually with the VM Service URI printed in the terminal:
 | `connect` | Connect to a Flutter app via VM Service URI |
 | `disconnect` | Disconnect from the app |
 | `get_app_info` | VM info, isolates, platform details, extensions |
+| `runtime_health_check` | Agent-oriented runtime baseline and recommended next diagnostic steps |
 
 ### Widget Inspection
 | Tool | Description |

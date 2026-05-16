@@ -6,12 +6,31 @@
 
 ---
 
+## 通用入口：先建立运行时基线
+
+任何专项诊断之前，建议先让 AI Agent 执行：
+
+`discover_apps` 或 `connect` ➡️ `runtime_health_check`
+
+`runtime_health_check` 的作用不是替代专项工具，而是帮助 Agent 快速判断：
+
+1. 当前是否已经连接到正确的 Flutter VM Service。
+2. 主 Isolate 是否处于可采集状态。
+3. Flutter Inspector、重建追踪、Hot Reload、截图等扩展是否可用。
+4. 当前页面是否能采集到项目 Widget。
+5. 是否已经出现明显的内存压力。
+6. 下一步应该进入 Widget、Rebuild、Profiling、Memory 还是 Network 诊断。
+
+如果你希望 Agent 在改代码后验证修复效果，使用 `mode: "deep"` 建立更完整的基线。修复后再执行同样的工具组合，比较前后输出，而不是只依赖静态代码判断。
+
+---
+
 ## 场景一：UI 卡顿与滑动掉帧 (UI Jank & Dropped Frames)
 
 当你在滑动列表或切换页面时感觉到肉眼可见的卡顿（帧率低于目标刷新率）。
 
 **🔧 推荐工具组合：**
-`start_profiling` ➡️ `stop_profiling` ➡️ `start_tracking_rebuilds` ➡️ `stop_tracking_rebuilds`
+`runtime_health_check` ➡️ `start_profiling` ➡️ `stop_profiling` ➡️ `start_tracking_rebuilds` ➡️ `stop_tracking_rebuilds`
 
 **📋 最佳实践步骤：**
 1. **宏观把脉**：确保 App 处于 Profile 模式。调用 `start_profiling` 开始录制，执行卡顿操作后，调用 `stop_profiling`。
@@ -30,7 +49,7 @@
 应用长时间运行后越来越卡，或者由于内存激增（Out of Memory）导致崩溃崩溃。
 
 **🔧 推荐工具组合：**
-`save_snapshot` (baseline) ➡️ 页面反复进退 ➡️ `save_snapshot` (after) ➡️ `compare_snapshots`
+`runtime_health_check` (`mode: "deep"`) ➡️ `save_snapshot` (baseline) ➡️ 页面反复进退 ➡️ `save_snapshot` (after) ➡️ `compare_snapshots`
 
 **📋 最佳实践步骤：**
 1. **设置基准线 (Baseline)**：在 App 刚启动并静止时，调用 `save_snapshot`（例如命名为 `baseline`），记得将 `forceGC` 设为 `true` 以排除游离垃圾。
@@ -46,7 +65,7 @@
 接手了一个遗留代码，某个页面非常臃肿（几千行代码），牵一发而动全身。
 
 **🔧 推荐工具组合：**
-`get_widget_tree` ➡️ `inspect_widget` ➡️ 代码编辑 ➡️ `hot_reload`
+`runtime_health_check` ➡️ `get_widget_tree` ➡️ `inspect_widget` ➡️ 代码编辑 ➡️ `hot_reload` ➡️ `runtime_health_check`
 
 **📋 最佳实践步骤：**
 1. **获取树状结构**：打开需要重构的页面，调用 `get_widget_tree`（设置 `projectOnly: true`）。
@@ -63,7 +82,7 @@
 拉取数据缓慢，或者疑似接口报错，需要查看真实的请求耗时和报文大小。
 
 **🔧 推荐工具组合：**
-`start_network_capture` ➡️ `stop_network_capture`
+`runtime_health_check` ➡️ `start_network_capture` ➡️ `stop_network_capture`
 
 **📋 最佳实践步骤：**
 1. **开启抓包**：调用 `start_network_capture` 开始监控底层网络流水。
@@ -83,7 +102,7 @@
 页面元素越界（Overflow）、约束错误，或者想要知道此时某个全局单例/静态变量的真实值，不想重新编译打断点。
 
 **🔧 推荐工具组合：**
-`toggle_debug_paint` ➡️ `take_screenshot` ➡️ `evaluate_expression`
+`runtime_health_check` ➡️ `toggle_debug_paint` ➡️ `take_screenshot` ➡️ `evaluate_expression`
 
 **📋 最佳实践步骤：**
 1. **看清约束**：调用 `toggle_debug_paint`，这会在整个屏幕上画出所有的 Widget 边界、边距和对齐指引线。
@@ -92,4 +111,4 @@
 
 ---
 
-**核心秘诀**：MCP 工具本质上是你（开发者）与底层 Dart VM 之间的桥梁。遇到问题时，**“先宏观定性（Profiling/Snapshot），再微观定点（Rebuild Tracker/Tree/Evaluate），最后实施代码修改”** 是确保效率最大化的无敌公式。
+**核心秘诀**：MCP 工具本质上是你（开发者）与底层 Dart VM 之间的桥梁。遇到问题时，**“先建立运行时基线（runtime_health_check），再宏观定性（Profiling/Snapshot），再微观定点（Rebuild Tracker/Tree/Evaluate），最后实施代码修改并复测”** 是让 IDE AI Agent 真正形成调试闭环的关键。

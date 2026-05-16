@@ -13,6 +13,7 @@ import { registerRebuildTrackerTools } from "./tools/rebuild-tracker.js";
 import { registerDiscoverTools } from "./tools/discover.js";
 import { registerNetworkTools } from "./tools/network.js";
 import { registerSnapshotDiffTools } from "./tools/snapshot-diff.js";
+import { registerRuntimeHealthTools } from "./tools/runtime-health.js";
 
 /**
  * Flutter DevTools MCP Server
@@ -39,6 +40,8 @@ const profiler = new Profiler(vmClient);
 registerDiscoverTools(server, vmClient);
 // 注册设备连接和状态工具
 registerConnectionTools(server, vmClient);
+// 注册运行时健康检查工具，作为 AI Agent 的首个诊断入口
+registerRuntimeHealthTools(server, vmClient);
 // 注册 Widget 树检查和操作工具
 registerWidgetTreeTools(server, vmClient);
 // 注册性能剖析工具
