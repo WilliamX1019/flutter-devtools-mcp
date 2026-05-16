@@ -4,6 +4,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { FlutterVmServiceClient } from "./services/vm-service-client.js";
 import { Profiler } from "./services/profiler.js";
+import { DiagnosticSessionStore } from "./services/diagnostic-session.js";
 import { registerConnectionTools } from "./tools/connection.js";
 import { registerWidgetTreeTools } from "./tools/widget-tree.js";
 import { registerProfilingTools } from "./tools/profiling.js";
@@ -14,6 +15,7 @@ import { registerDiscoverTools } from "./tools/discover.js";
 import { registerNetworkTools } from "./tools/network.js";
 import { registerSnapshotDiffTools } from "./tools/snapshot-diff.js";
 import { registerRuntimeHealthTools } from "./tools/runtime-health.js";
+import { registerDiagnosticSessionTools } from "./tools/diagnostic-session.js";
 
 /**
  * Flutter DevTools MCP Server
@@ -35,9 +37,12 @@ const vmClient = new FlutterVmServiceClient();
  * 依赖于 vmClient，用于收集和分析 Flutter 应用程序的时间线（Timeline）事件
  */
 const profiler = new Profiler(vmClient);
+const diagnosticSessions = new DiagnosticSessionStore();
 
 // 注册发现和环境探测工具
 registerDiscoverTools(server, vmClient);
+// 注册诊断会话工具，用于将多次工具调用组织成可复测的调查过程
+registerDiagnosticSessionTools(server, diagnosticSessions);
 // 注册设备连接和状态工具
 registerConnectionTools(server, vmClient);
 // 注册运行时健康检查工具，作为 AI Agent 的首个诊断入口

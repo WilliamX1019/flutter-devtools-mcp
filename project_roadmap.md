@@ -233,6 +233,7 @@ Agent 修改代码前应尽量先拿到运行时证据：
 
 #### Task 2.1 — Diagnostic Session 模型
 
+- **状态**：已完成。
 - **目标**：保存一次诊断中的基线、专项采集结果和复测结果。
 - **新增工具建议**：
   - `start_diagnostic_session`
@@ -249,9 +250,11 @@ Agent 修改代码前应尽量先拿到运行时证据：
   - `verificationRuns`
 - **验收**：
   - Agent 可以创建 session，并把 runtime health、profiling、rebuild、memory 结果归档到同一 session。
+  - 已新增 `start_diagnostic_session`、`record_diagnostic_observation`、`list_diagnostic_sessions`、`end_diagnostic_session`。
 
 #### Task 2.2 — 统一结构化报告 Schema
 
+- **状态**：已完成。
 - **目标**：让工具结果可以被 Agent 稳定解析和排序。
 - **建议字段**：
 
@@ -280,7 +283,7 @@ interface DiagnosticFinding {
 ```
 
 - **验收**：
-  - `runtime_health_check`、`stop_profiling`、`stop_tracking_rebuilds` 至少输出同源结构化 finding。
+  - `runtime_health_check`、`stop_profiling`、`stop_tracking_rebuilds` 已输出同源结构化 finding。
   - 文本报告保持兼容。
 
 #### Task 2.3 — 前后对比能力
@@ -436,7 +439,7 @@ interface DiagnosticFinding {
 |------|--------|------|------|
 | Batch 1 | P0 | Task 1.1 | 已完成：抽取公共 format/type，清理 runtime_health_check 带来的重复 |
 | Batch 2 | P0 | Task 1.2 | 已完成：测试框架、format、Widget 统计、Profiler Timeline 分析单测 |
-| Batch 3 | P0 | Task 2.1 + Task 2.2 | 建立诊断会话和结构化 finding schema |
+| Batch 3 | P0 | Task 2.1 + Task 2.2 | 已完成：建立诊断会话和结构化 finding schema |
 | Batch 4 | P1 | Task 3.1 + Task 3.2 | 增加 MCP Resources 和 Prompts |
 | Batch 5 | P1 | Task 2.3 | 做 before/after 对比，形成验证闭环 |
 | Batch 6 | P1 | Task 4.1 + Task 4.4 | 强化性能诊断和视觉验证 |
@@ -446,9 +449,9 @@ interface DiagnosticFinding {
 
 ### 最近三步
 
-1. **先做 Task 2.1 / 2.2**：诊断会话和结构化 finding 是 Agent 闭环的地基。
-2. **再做 Task 3.1 / 3.2**：通过 MCP Resources 和 Prompts 固化 Agent 工作流。
-3. **随后做 Task 2.3**：补 before/after 对比，让 Agent 能验证修复是否真的改善。
+1. **先做 Task 3.1 / 3.2**：通过 MCP Resources 和 Prompts 固化 Agent 工作流。
+2. **再做 Task 2.3**：补 before/after 对比，让 Agent 能验证修复是否真的改善。
+3. **随后做 Task 4.1 / 4.4**：强化 Timeline 分析可靠性和视觉验证能力。
 
 ---
 

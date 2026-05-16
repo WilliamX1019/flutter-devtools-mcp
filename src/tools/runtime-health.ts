@@ -7,7 +7,12 @@ import {
 import { IsolateInfo } from "../types/runtime.js";
 import { WidgetNode } from "../types/widget.js";
 import { formatBytes } from "../utils/format.js";
+import {
+  appendDiagnosticFindings,
+  createFindingId,
+} from "../utils/diagnostic-findings.js";
 import { collectWidgetStats, WidgetStats } from "../utils/widget-stats.js";
+import { DiagnosticFinding } from "../types/diagnostics.js";
 
 function summarizeMemory(profile: AllocationProfile) {
   const { heapUsage, heapCapacity, externalUsage } = profile.memoryUsage;
@@ -98,6 +103,81 @@ function buildNextSteps(args: {
   }
 
   return steps;
+}
+
+function buildRuntimeFindings(args: {
+  pauseState: string;
+  widgetStats?: WidgetStats;
+  heapUtilization?: number;
+  extensions: ReturnType<typeof extensionStatus>;
+}): DiagnosticFinding[] {
+  const findings: DiagnosticFinding[] = [];
+
+  if (args.pauseState !== "Resume" && args.pauseState !== "unknown") {
+    findings.push({
+      id: createFindingId("runtime", "isolate-paused"),
+      severity: "high",
+      category: "runtime",
+      title: "Main isolate is not running normally",
+      evidence: `Pause state is ${args.pauseState}. Runtime diagnostics may be incomplete until this is resolved.`,
+      recommendation:
+        "Resolve the pause or exception state, then rerun runtime_health_check.",
+      nextTool: "get_app_info",
+    });
+  }
+
+  if (!args.extensions.inspector) {
+    findings.push({
+      id: createFindingId("runtime", "inspector-extension-missing"),
+      severity: "medium",
+      category: "runtime",
+      title: "Flutter inspector extension is unavailable",
+      evidence:
+        "The connected isolate did not report the expected Flutter inspector service extension.",
+      recommendation:
+        "Run the app in debug or profile mode and reconnect before widget diagnostics.",
+      nextTool: "get_app_info",
+    });
+  }
+
+  if (args.widgetStats && args.widgetStats.projectWidgets === 0) {
+    findings.push({
+      id: createFindingId("widget", "no-project-widgets-in-baseline"),
+      severity: "low",
+      category: "widget",
+      title: "No project widgets detected in shallow baseline",
+      evidence: `Sampled ${args.widgetStats.totalWidgets} widgets but found 0 project widgets.`,
+      metric: {
+        name: "projectWidgets",
+        value: 0,
+        unit: "widgets",
+      },
+      recommendation:
+        "Run get_widget_tree with a deeper maxDepth or projectOnly=false to inspect the full tree.",
+      nextTool: "get_widget_tree",
+    });
+  }
+
+  if (args.heapUtilization !== undefined && args.heapUtilization > 75) {
+    findings.push({
+      id: createFindingId("memory", "high-heap-utilization"),
+      severity: args.heapUtilization > 85 ? "critical" : "high",
+      category: "memory",
+      title: "Heap utilization is high",
+      evidence: `Heap utilization is ${args.heapUtilization.toFixed(1)}%.`,
+      metric: {
+        name: "heapUtilization",
+        value: Number(args.heapUtilization.toFixed(1)),
+        unit: "percent",
+        threshold: 75,
+      },
+      recommendation:
+        "Save a before snapshot, reproduce the memory path, save an after snapshot, then compare snapshots.",
+      nextTool: "save_snapshot",
+    });
+  }
+
+  return findings;
 }
 
 export function registerRuntimeHealthTools(
@@ -260,6 +340,12 @@ export function registerRuntimeHealthTools(
           extensions: extStatus,
           mode,
         });
+        const findings = buildRuntimeFindings({
+          pauseState,
+          widgetStats,
+          heapUtilization: memorySummary?.heapUtilization,
+          extensions: extStatus,
+        });
 
         lines.push(
           "",
@@ -267,6 +353,8 @@ export function registerRuntimeHealthTools(
           "-----------------------------------------------------------",
           ...nextSteps.map((step, index) => `${index + 1}. ${step}`)
         );
+
+        appendDiagnosticFindings(lines, findings);
 
         return {
           content: [{ type: "text" as const, text: lines.join("\n") }],

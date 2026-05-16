@@ -1,6 +1,75 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { FlutterVmServiceClient } from "../services/vm-service-client.js";
 import { Profiler } from "../services/profiler.js";
+import {
+  appendDiagnosticFindings,
+  createFindingId,
+} from "../utils/diagnostic-findings.js";
+import { DiagnosticFinding } from "../types/diagnostics.js";
+
+function buildProfilingFindings(result: Awaited<ReturnType<Profiler["stop"]>>) {
+  const findings: DiagnosticFinding[] = [];
+
+  if (result.frameAnalysis.jankPercentage > 10) {
+    findings.push({
+      id: createFindingId("performance", "jank-rate"),
+      severity: result.frameAnalysis.jankPercentage > 25 ? "critical" : "high",
+      category: "performance",
+      title: "Significant frame jank detected",
+      evidence: `${result.frameAnalysis.jankFrames} of ${result.frameAnalysis.totalFrames} frames were janky (${result.frameAnalysis.jankPercentage.toFixed(1)}%).`,
+      metric: {
+        name: "jankPercentage",
+        value: Number(result.frameAnalysis.jankPercentage.toFixed(1)),
+        unit: "percent",
+        threshold: 10,
+      },
+      recommendation:
+        "Inspect phase breakdown and CPU hotspots, then run rebuild tracking if build time is high.",
+      nextTool: "start_tracking_rebuilds",
+    });
+  }
+
+  if (result.buildPhaseAnalysis.maxBuildTimeMs > 16) {
+    findings.push({
+      id: createFindingId("performance", "slow-build-phase"),
+      severity: "high",
+      category: "performance",
+      title: "Build phase exceeds frame budget",
+      evidence: `Max build phase time is ${result.buildPhaseAnalysis.maxBuildTimeMs.toFixed(2)}ms.`,
+      metric: {
+        name: "maxBuildTimeMs",
+        value: Number(result.buildPhaseAnalysis.maxBuildTimeMs.toFixed(2)),
+        unit: "ms",
+        threshold: 16,
+      },
+      recommendation:
+        "Run rebuild tracking and inspect high-rebuild widgets before changing state management or widget boundaries.",
+      nextTool: "start_tracking_rebuilds",
+    });
+  }
+
+  for (const hotspot of result.cpuHotspots.filter(
+    (h) => h.severity === "critical" || h.severity === "high"
+  )) {
+    findings.push({
+      id: createFindingId("performance", `hotspot-${hotspot.name}`),
+      severity: hotspot.severity,
+      category: "performance",
+      title: `CPU hotspot: ${hotspot.name}`,
+      evidence: `${hotspot.name} took ${hotspot.maxDurationMs.toFixed(1)}ms max across ${hotspot.callCount} calls.`,
+      metric: {
+        name: "maxDurationMs",
+        value: hotspot.maxDurationMs,
+        unit: "ms",
+        threshold: hotspot.severity === "critical" ? 100 : 32,
+      },
+      recommendation:
+        "Inspect the source path for this work if available in Timeline details, or narrow with targeted reproduction.",
+    });
+  }
+
+  return findings;
+}
 
 /**
  * 注册 Flutter 性能分析相关的 MCP 工具
@@ -157,6 +226,8 @@ export function registerProfilingTools(
         for (const rec of result.recommendations) {
           output.push(`• ${rec}`);
         }
+
+        appendDiagnosticFindings(output, buildProfilingFindings(result));
 
         return {
           content: [

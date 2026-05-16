@@ -1,6 +1,11 @@
 import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { FlutterVmServiceClient } from "../services/vm-service-client.js";
+import {
+  appendDiagnosticFindings,
+  createFindingId,
+} from "../utils/diagnostic-findings.js";
+import { DiagnosticFinding } from "../types/diagnostics.js";
 
 /**
  * 重建事件数据结构，反映来自 Flutter Framework 的重建通知
@@ -21,6 +26,35 @@ interface RebuildEntry {
   file: string;
   line: number;
   rebuildCount: number;
+}
+
+function buildRebuildFindings(entries: RebuildEntry[]): DiagnosticFinding[] {
+  return entries
+    .filter((entry) => entry.rebuildCount > 50)
+    .slice(0, 10)
+    .map((entry) => ({
+      id: createFindingId("rebuild", `${entry.widgetName}-${entry.file}-${entry.line}`),
+      severity: entry.rebuildCount > 100 ? "critical" : "high",
+      category: "rebuild",
+      title: `${entry.widgetName} rebuilt excessively`,
+      evidence: `${entry.widgetName} rebuilt ${entry.rebuildCount} times at ${entry.file}:${entry.line}.`,
+      metric: {
+        name: "rebuildCount",
+        value: entry.rebuildCount,
+        unit: "rebuilds",
+        threshold: 50,
+      },
+      location: {
+        file: entry.file,
+        line: entry.line,
+        symbol: entry.widgetName,
+      },
+      recommendation:
+        entry.rebuildCount > 100
+          ? "Check broad inherited dependencies, Provider/context.watch usage, and state changes that fan out too widely."
+          : "Consider const constructors, selector-based listening, or extracting a smaller widget boundary.",
+      nextTool: "get_widget_tree",
+    }));
 }
 
 /**
@@ -300,6 +334,8 @@ export function registerRebuildTrackerTools(
             );
           }
         }
+
+        appendDiagnosticFindings(output, buildRebuildFindings(entries));
 
         return {
           content: [
