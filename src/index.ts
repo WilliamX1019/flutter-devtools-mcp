@@ -7,6 +7,7 @@ import { Profiler } from "./services/profiler.js";
 import { DiagnosticSessionStore } from "./services/diagnostic-session.js";
 import { MemorySnapshotStore } from "./services/memory-snapshot-store.js";
 import { RuntimeHealthStore } from "./services/runtime-health-store.js";
+import { RuntimeMonitor } from "./services/runtime-monitor.js";
 import { registerConnectionTools } from "./tools/connection.js";
 import { registerWidgetTreeTools } from "./tools/widget-tree.js";
 import { registerProfilingTools } from "./tools/profiling.js";
@@ -18,6 +19,7 @@ import { registerNetworkTools } from "./tools/network.js";
 import { registerSnapshotDiffTools } from "./tools/snapshot-diff.js";
 import { registerRuntimeHealthTools } from "./tools/runtime-health.js";
 import { registerDiagnosticSessionTools } from "./tools/diagnostic-session.js";
+import { registerMonitoringTools } from "./tools/monitoring.js";
 import { registerDiagnosticResources } from "./resources/diagnostic-resources.js";
 import { registerDiagnosticPrompts } from "./prompts/diagnostic-prompts.js";
 
@@ -44,6 +46,18 @@ const profiler = new Profiler(vmClient);
 const diagnosticSessions = new DiagnosticSessionStore();
 const memorySnapshots = new MemorySnapshotStore();
 const runtimeHealth = new RuntimeHealthStore();
+const runtimeMonitor = new RuntimeMonitor(vmClient, (alert) =>
+  server.sendLoggingMessage({
+    level:
+      alert.severity === "critical"
+        ? "critical"
+        : alert.severity === "high"
+          ? "warning"
+          : "info",
+    logger: "flutter.runtime.monitor",
+    data: alert,
+  })
+);
 
 // 注册发现和环境探测工具
 registerDiscoverTools(server, vmClient);
@@ -56,7 +70,8 @@ registerDiagnosticResources(
   profiler,
   diagnosticSessions,
   memorySnapshots,
-  runtimeHealth
+  runtimeHealth,
+  runtimeMonitor
 );
 registerDiagnosticPrompts(server);
 // 注册设备连接和状态工具
@@ -73,6 +88,8 @@ registerMemoryTools(server, vmClient);
 registerRebuildTrackerTools(server, vmClient);
 // 注册网络请求拦截和分析工具
 registerNetworkTools(server, vmClient);
+// 注册持续监控工具，用于异步感知 jank、GC、异常和断连
+registerMonitoringTools(server, vmClient, runtimeMonitor);
 // 注册快照对比工具
 registerSnapshotDiffTools(server, vmClient, memorySnapshots);
 // 注册调试操作工具 (如热重载、热重启等)

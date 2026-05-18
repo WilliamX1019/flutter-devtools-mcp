@@ -3,6 +3,7 @@ import { DiagnosticSessionStore } from "../services/diagnostic-session.js";
 import { MemorySnapshotStore } from "../services/memory-snapshot-store.js";
 import { Profiler } from "../services/profiler.js";
 import { RuntimeHealthStore } from "../services/runtime-health-store.js";
+import { RuntimeMonitor } from "../services/runtime-monitor.js";
 import { FlutterVmServiceClient } from "../services/vm-service-client.js";
 
 function jsonResource(uri: URL, value: unknown) {
@@ -23,7 +24,8 @@ export function registerDiagnosticResources(
   profiler: Profiler,
   sessions: DiagnosticSessionStore,
   snapshots: MemorySnapshotStore,
-  runtimeHealth: RuntimeHealthStore
+  runtimeHealth: RuntimeHealthStore,
+  monitor?: RuntimeMonitor
 ) {
   server.registerResource(
     "connection-status",
@@ -53,6 +55,20 @@ export function registerDiagnosticResources(
     async (uri) =>
       jsonResource(uri, {
         latest: runtimeHealth.latest() ?? null,
+      })
+  );
+
+  server.registerResource(
+    "monitoring-status",
+    "flutter://monitoring/status",
+    {
+      title: "Runtime Monitoring Status",
+      description: "Current continuous monitoring state and retained alert window.",
+      mimeType: "application/json",
+    },
+    async (uri) =>
+      jsonResource(uri, {
+        monitoring: monitor?.status() ?? null,
       })
   );
 

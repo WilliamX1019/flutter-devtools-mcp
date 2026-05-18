@@ -59,7 +59,7 @@ graph LR
 | 分析引擎 | `src/services/profiler.ts` | 解析 Timeline，生成帧率、阶段耗时、CPU 热点分析 |
 | 工具层 | `src/tools/*.ts` | 面向 AI Agent 暴露 MCP Tools |
 
-### 当前工具清单（28 个）
+### 当前工具清单（31 个）
 
 | 类别 | 工具名 | 状态 |
 |------|--------|------|
@@ -69,6 +69,7 @@ graph LR
 | 性能 | `start_profiling`, `stop_profiling` | 已具备 |
 | 内存 | `get_memory_snapshot`, `save_snapshot`, `compare_snapshots`, `list_snapshots` | 已具备 |
 | 网络 | `start_network_capture`, `stop_network_capture` | 已具备 |
+| 持续监控 | `start_monitoring`, `get_monitoring_status`, `stop_monitoring` | 已具备 |
 | 调试动作 | `hot_reload`, `hot_restart`, `take_screenshot`, `compare_screenshots`, `toggle_debug_paint`, `evaluate_expression` | 已具备 |
 | 诊断会话 | `start_diagnostic_session`, `record_diagnostic_observation`, `compare_diagnostic_runs`, `list_diagnostic_sessions`, `end_diagnostic_session` | 已具备 |
 
@@ -80,6 +81,7 @@ graph LR
 | Resource | `flutter://runtime/health/latest` | 已具备 |
 | Resource | `flutter://snapshots` | 已具备 |
 | Resource | `flutter://profiling/status` | 已具备 |
+| Resource | `flutter://monitoring/status` | 已具备 |
 | Resource | `flutter://diagnostic-sessions` | 已具备 |
 | Prompt | `diagnose_jank` | 已具备 |
 | Prompt | `diagnose_memory_leak` | 已具备 |
@@ -330,6 +332,7 @@ interface DiagnosticFinding {
   - `flutter://runtime/health/latest`
   - `flutter://snapshots`
   - `flutter://profiling/status`
+  - `flutter://monitoring/status`
   - `flutter://diagnostic-sessions`
 - **验收**：
   - MCP Inspector 可列出并读取这些 Resources。
@@ -351,14 +354,16 @@ interface DiagnosticFinding {
 
 #### Task 3.3 — Notifications
 
+- **状态**：已完成。
 - **目标**：让 Agent 能感知异步运行时事件。
 - **事件来源**：
-  - VM Service 断连。
-  - Isolate pause / exception。
-  - GC 压力。
-  - Continuous monitoring 的 jank 告警。
+  - 已支持 VM Service 断连。
+  - 已支持 Isolate pause / exception。
+  - 已支持 GC 压力。
+  - 已支持 Continuous monitoring 的 jank 告警。
 - **验收**：
-  - 触发对应运行时事件时，Agent 侧收到 MCP Notification。
+  - 触发对应运行时事件时，Agent 侧收到 MCP logging notification。
+  - 告警窗口可通过 `get_monitoring_status` 和 `flutter://monitoring/status` 读取。
 
 ---
 
@@ -419,12 +424,15 @@ interface DiagnosticFinding {
 
 #### Task 5.1 — Continuous Monitoring
 
+- **状态**：已完成。
 - **目标**：持续监测 jank、GC、异常和断连。
-- **新增工具建议**：
+- **新增工具**：
   - `start_monitoring`
+  - `get_monitoring_status`
   - `stop_monitoring`
 - **验收**：
   - 滑动或动画出现连续 jank 时，Agent 收到告警，并能读取窗口内趋势。
+  - 已覆盖 jank、GC、exception、disconnect 和停止监听的单元测试。
 
 #### Task 5.2 — Export Reports
 
@@ -465,15 +473,15 @@ interface DiagnosticFinding {
 | Batch 4 | P1 | Task 3.1 + Task 3.2 | 已完成：增加 MCP Resources 和 Prompts |
 | Batch 5 | P1 | Task 2.3 | 已完成：做 before/after 对比，形成验证闭环 |
 | Batch 6 | P1 | Task 4.1 + Task 4.4 | 已完成：强化性能诊断和视觉验证 |
-| Batch 7 | P2 | Task 3.3 + Task 5.1 | 增加异步通知和持续监控 |
+| Batch 7 | P2 | Task 3.3 + Task 5.1 | 已完成：增加异步通知和持续监控 |
 | Batch 8 | P2 | Task 4.2 + Task 4.3 + Task 5.2 | 补齐 shader、network、report |
 | Batch 9 | P2 | Task 5.3 | 用 demo app 做端到端回归 |
 
 ### 最近三步
 
-1. **先做 Task 3.3 / 5.1**：引入异步通知和持续监控，让 Agent 能在运行时事件发生时主动响应。
-2. **再做 Task 4.2 / 4.3 / 5.2**：补齐 shader、network、report，提升专项诊断覆盖面。
-3. **随后做 Task 5.3**：用 demo app 做端到端回归，校准工具输出质量。
+1. **先做 Task 4.2 / 4.3 / 5.2**：补齐 shader、network、report，提升专项诊断覆盖面。
+2. **再做 Task 5.3**：用 demo app 做端到端回归，校准工具输出质量。
+3. **随后做连接状态机增强**：补自动重连和断连恢复策略，提升长时间监控稳定性。
 
 ---
 

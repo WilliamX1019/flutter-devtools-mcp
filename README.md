@@ -236,6 +236,13 @@ to call.
 | `start_network_capture` | Start capturing HTTP traffic |
 | `stop_network_capture` | Report: URLs, status codes, timing, sizes, errors |
 
+### Runtime Monitoring
+| Tool | Description |
+|------|-------------|
+| `start_monitoring` | Start continuous alerts for jank, GC, exceptions, and disconnects |
+| `get_monitoring_status` | Read retained monitoring alerts and trend counts |
+| `stop_monitoring` | Stop monitoring and return the alert summary |
+
 ### Debug Actions
 | Tool | Description |
 |------|-------------|
