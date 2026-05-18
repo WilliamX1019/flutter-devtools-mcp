@@ -59,7 +59,7 @@ graph LR
 | 分析引擎 | `src/services/profiler.ts` | 解析 Timeline，生成帧率、阶段耗时、CPU 热点分析 |
 | 工具层 | `src/tools/*.ts` | 面向 AI Agent 暴露 MCP Tools |
 
-### 当前工具清单（27 个）
+### 当前工具清单（28 个）
 
 | 类别 | 工具名 | 状态 |
 |------|--------|------|
@@ -69,7 +69,7 @@ graph LR
 | 性能 | `start_profiling`, `stop_profiling` | 已具备 |
 | 内存 | `get_memory_snapshot`, `save_snapshot`, `compare_snapshots`, `list_snapshots` | 已具备 |
 | 网络 | `start_network_capture`, `stop_network_capture` | 已具备 |
-| 调试动作 | `hot_reload`, `hot_restart`, `take_screenshot`, `toggle_debug_paint`, `evaluate_expression` | 已具备 |
+| 调试动作 | `hot_reload`, `hot_restart`, `take_screenshot`, `compare_screenshots`, `toggle_debug_paint`, `evaluate_expression` | 已具备 |
 | 诊断会话 | `start_diagnostic_session`, `record_diagnostic_observation`, `compare_diagnostic_runs`, `list_diagnostic_sessions`, `end_diagnostic_session` | 已具备 |
 
 ### 当前 MCP Resources / Prompts
@@ -401,13 +401,15 @@ interface DiagnosticFinding {
 
 #### Task 4.4 — Screenshot 保存与视觉对比
 
+- **状态**：已完成。
 - **目标**：支持 UI 修复前后验证。
 - **实现要点**：
-  - `take_screenshot` 增加可选 `savePath`。
-  - 新增 `compare_screenshots`。
-  - 输出两张图片和差异摘要，供多模态 Agent 判断。
+  - `take_screenshot` 已增加可选 `savePath`。
+  - 已新增 `compare_screenshots`。
+  - 已输出 PNG 尺寸、hash、字节差异和摘要，供 Agent 引用 before/after 文件进行视觉复核。
 - **验收**：
   - 修复布局问题后，Agent 能引用 before/after screenshot 进行视觉复核。
+  - 已覆盖 PNG 元数据、base64 解码和截图字节差异对比单元测试。
 
 ---
 
@@ -462,16 +464,16 @@ interface DiagnosticFinding {
 | Batch 3 | P0 | Task 2.1 + Task 2.2 | 已完成：建立诊断会话和结构化 finding schema |
 | Batch 4 | P1 | Task 3.1 + Task 3.2 | 已完成：增加 MCP Resources 和 Prompts |
 | Batch 5 | P1 | Task 2.3 | 已完成：做 before/after 对比，形成验证闭环 |
-| Batch 6 | P1 | Task 4.1 + Task 4.4 | 进行中：Task 4.1 已完成，下一步强化视觉验证 |
+| Batch 6 | P1 | Task 4.1 + Task 4.4 | 已完成：强化性能诊断和视觉验证 |
 | Batch 7 | P2 | Task 3.3 + Task 5.1 | 增加异步通知和持续监控 |
 | Batch 8 | P2 | Task 4.2 + Task 4.3 + Task 5.2 | 补齐 shader、network、report |
 | Batch 9 | P2 | Task 5.3 | 用 demo app 做端到端回归 |
 
 ### 最近三步
 
-1. **先做 Task 4.4**：让截图可落盘并支持 before/after 视觉验证。
-2. **再做 Task 3.3 / 5.1**：引入异步通知和持续监控，让 Agent 能在运行时事件发生时主动响应。
-3. **随后做 Task 4.2 / 4.3 / 5.2**：补齐 shader、network、report，提升专项诊断覆盖面。
+1. **先做 Task 3.3 / 5.1**：引入异步通知和持续监控，让 Agent 能在运行时事件发生时主动响应。
+2. **再做 Task 4.2 / 4.3 / 5.2**：补齐 shader、network、report，提升专项诊断覆盖面。
+3. **随后做 Task 5.3**：用 demo app 做端到端回归，校准工具输出质量。
 
 ---
 

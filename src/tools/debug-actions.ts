@@ -1,6 +1,17 @@
 import { z } from "zod";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { dirname, resolve } from "node:path";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { FlutterVmServiceClient } from "../services/vm-service-client.js";
+import {
+  base64ToBuffer,
+  compareScreenshotBuffers,
+  screenshotMetadata,
+} from "../services/screenshot-comparison.js";
+
+type ToolContent =
+  | { type: "text"; text: string }
+  | { type: "image"; data: string; mimeType: "image/png" };
 
 /**
  * 注册 Flutter 调试操作相关的 MCP 工具
@@ -105,9 +116,17 @@ export function registerDebugActionTools(
     "take_screenshot",
     {
       description:
-        "Capture a screenshot of the running Flutter app. Returns the screenshot as a base64-encoded PNG image.",
+        "Capture a screenshot of the running Flutter app. Returns the screenshot as a PNG image and can optionally save it to disk for before/after comparison.",
+      inputSchema: {
+        savePath: z
+          .string()
+          .optional()
+          .describe(
+            "Optional file path to save the PNG screenshot. Relative paths are resolved from the current working directory."
+          ),
+      },
     },
-    async () => {
+    async ({ savePath }) => {
       if (!client.connected) {
         return {
           content: [
@@ -127,14 +146,38 @@ export function registerDebugActionTools(
         };
 
         if (result?.screenshot) {
+          const content: ToolContent[] = [
+            {
+              type: "image" as const,
+              data: result.screenshot,
+              mimeType: "image/png" as const,
+            },
+          ];
+
+          if (savePath) {
+            const targetPath = resolve(savePath);
+            const buffer = base64ToBuffer(result.screenshot);
+            await mkdir(dirname(targetPath), { recursive: true });
+            await writeFile(targetPath, buffer);
+            const metadata = screenshotMetadata(buffer);
+
+            content.unshift({
+              type: "text" as const,
+              text: JSON.stringify(
+                {
+                  status: "saved",
+                  path: targetPath,
+                  metadata,
+                  nextStep: "Capture an after screenshot and run compare_screenshots.",
+                },
+                null,
+                2
+              ),
+            });
+          }
+
           return {
-            content: [
-              {
-                type: "image" as const,
-                data: result.screenshot,
-                mimeType: "image/png" as const,
-              },
-            ],
+            content,
           };
         }
 
@@ -152,6 +195,60 @@ export function registerDebugActionTools(
             {
               type: "text" as const,
               text: `Failed to take screenshot: ${error instanceof Error ? error.message : String(error)}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  server.registerTool(
+    "compare_screenshots",
+    {
+      description:
+        "Compare two saved PNG screenshots and return exact-match, dimensions, hash, and byte-difference evidence for visual verification.",
+      inputSchema: {
+        beforePath: z
+          .string()
+          .describe("Path to the before screenshot saved by take_screenshot."),
+        afterPath: z
+          .string()
+          .describe("Path to the after screenshot saved by take_screenshot."),
+      },
+    },
+    async ({ beforePath, afterPath }) => {
+      try {
+        const beforeResolved = resolve(beforePath);
+        const afterResolved = resolve(afterPath);
+        const [before, after] = await Promise.all([
+          readFile(beforeResolved),
+          readFile(afterResolved),
+        ]);
+        const comparison = compareScreenshotBuffers(before, after);
+
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: JSON.stringify(
+                {
+                  beforePath: beforeResolved,
+                  afterPath: afterResolved,
+                  ...comparison,
+                },
+                null,
+                2
+              ),
+            },
+          ],
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `Failed to compare screenshots: ${error instanceof Error ? error.message : String(error)}`,
             },
           ],
           isError: true,

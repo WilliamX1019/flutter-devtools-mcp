@@ -241,7 +241,8 @@ to call.
 |------|-------------|
 | `hot_reload` | Trigger hot reload |
 | `hot_restart` | Trigger hot restart |
-| `take_screenshot` | Capture current screen as PNG |
+| `take_screenshot` | Capture current screen as PNG, optionally saving to disk |
+| `compare_screenshots` | Compare saved before/after screenshots |
 | `toggle_debug_paint` | Toggle debug paint overlay |
 | `evaluate_expression` | Evaluate Dart expressions in the running app |
 
