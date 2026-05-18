@@ -59,7 +59,7 @@ graph LR
 | 分析引擎 | `src/services/profiler.ts` | 解析 Timeline，生成帧率、阶段耗时、CPU 热点分析 |
 | 工具层 | `src/tools/*.ts` | 面向 AI Agent 暴露 MCP Tools |
 
-### 当前工具清单（22 个）
+### 当前工具清单（26 个）
 
 | 类别 | 工具名 | 状态 |
 |------|--------|------|
@@ -70,6 +70,22 @@ graph LR
 | 内存 | `get_memory_snapshot`, `save_snapshot`, `compare_snapshots`, `list_snapshots` | 已具备 |
 | 网络 | `start_network_capture`, `stop_network_capture` | 已具备 |
 | 调试动作 | `hot_reload`, `hot_restart`, `take_screenshot`, `toggle_debug_paint`, `evaluate_expression` | 已具备 |
+| 诊断会话 | `start_diagnostic_session`, `record_diagnostic_observation`, `list_diagnostic_sessions`, `end_diagnostic_session` | 已具备 |
+
+### 当前 MCP Resources / Prompts
+
+| 类型 | 名称 | 状态 |
+|------|------|------|
+| Resource | `flutter://connection/status` | 已具备 |
+| Resource | `flutter://runtime/health/latest` | 已具备 |
+| Resource | `flutter://snapshots` | 已具备 |
+| Resource | `flutter://profiling/status` | 已具备 |
+| Resource | `flutter://diagnostic-sessions` | 已具备 |
+| Prompt | `diagnose_jank` | 已具备 |
+| Prompt | `diagnose_memory_leak` | 已具备 |
+| Prompt | `diagnose_layout_issue` | 已具备 |
+| Prompt | `diagnose_network_issue` | 已具备 |
+| Prompt | `verify_fix` | 已具备 |
 
 ### 已完成的关键进展
 
@@ -309,6 +325,7 @@ interface DiagnosticFinding {
 
 #### Task 3.1 — MCP Resources
 
+- **状态**：已完成。
 - **目标**：暴露当前状态，减少重复 Tool 调用。
 - **Resources**：
   - `flutter://connection/status`
@@ -318,9 +335,12 @@ interface DiagnosticFinding {
   - `flutter://diagnostic-sessions`
 - **验收**：
   - MCP Inspector 可列出并读取这些 Resources。
+  - `runtime_health_check` 成功执行后会刷新 `flutter://runtime/health/latest`。
+  - `save_snapshot` 写入的快照会同步反映在 `flutter://snapshots`。
 
 #### Task 3.2 — MCP Prompts
 
+- **状态**：已完成。
 - **目标**：把专家排查流程固化为 Agent 可调用模板。
 - **Prompts**：
   - `diagnose_jank`
@@ -440,7 +460,7 @@ interface DiagnosticFinding {
 | Batch 1 | P0 | Task 1.1 | 已完成：抽取公共 format/type，清理 runtime_health_check 带来的重复 |
 | Batch 2 | P0 | Task 1.2 | 已完成：测试框架、format、Widget 统计、Profiler Timeline 分析单测 |
 | Batch 3 | P0 | Task 2.1 + Task 2.2 | 已完成：建立诊断会话和结构化 finding schema |
-| Batch 4 | P1 | Task 3.1 + Task 3.2 | 增加 MCP Resources 和 Prompts |
+| Batch 4 | P1 | Task 3.1 + Task 3.2 | 已完成：增加 MCP Resources 和 Prompts |
 | Batch 5 | P1 | Task 2.3 | 做 before/after 对比，形成验证闭环 |
 | Batch 6 | P1 | Task 4.1 + Task 4.4 | 强化性能诊断和视觉验证 |
 | Batch 7 | P2 | Task 3.3 + Task 5.1 | 增加异步通知和持续监控 |
@@ -449,9 +469,9 @@ interface DiagnosticFinding {
 
 ### 最近三步
 
-1. **先做 Task 3.1 / 3.2**：通过 MCP Resources 和 Prompts 固化 Agent 工作流。
-2. **再做 Task 2.3**：补 before/after 对比，让 Agent 能验证修复是否真的改善。
-3. **随后做 Task 4.1 / 4.4**：强化 Timeline 分析可靠性和视觉验证能力。
+1. **先做 Task 2.3**：补 before/after 对比，让 Agent 能验证修复是否真的改善。
+2. **再做 Task 4.1 / 4.4**：强化 Timeline 分析可靠性和视觉验证能力。
+3. **随后做 Task 3.3 / 5.1**：引入异步通知和持续监控，让 Agent 能在运行时事件发生时主动响应。
 
 ---
 

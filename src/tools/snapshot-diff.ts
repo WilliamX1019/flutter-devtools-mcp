@@ -1,25 +1,11 @@
 import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { FlutterVmServiceClient } from "../services/vm-service-client.js";
+import {
+  MemorySnapshot,
+  MemorySnapshotStore,
+} from "../services/memory-snapshot-store.js";
 import { formatBytes, pctChange } from "../utils/format.js";
-
-/**
- * 内存快照数据结构
- */
-interface Snapshot {
-  name: string;
-  timestamp: number;
-  memory: {
-    heapUsage: number;
-    heapCapacity: number;
-    externalUsage: number;
-    topClasses: Array<{
-      name: string;
-      bytes: number;
-      instances: number;
-    }>;
-  };
-}
 
 /**
  * 注册与内存快照对比相关的 MCP 工具
@@ -29,18 +15,16 @@ interface Snapshot {
  */
 export function registerSnapshotDiffTools(
   server: McpServer,
-  client: FlutterVmServiceClient
+  client: FlutterVmServiceClient,
+  snapshotStore: MemorySnapshotStore = new MemorySnapshotStore()
 ) {
-  // 存储所有已保存的快照，Key 为快照名称
-  const snapshots = new Map<string, Snapshot>();
-
   /**
    * 获取并记录一个命名内存快照
    * @param name 快照名称
    * @param gc 是否在获取快照前强制进行垃圾回收
    * @returns 获取到的快照数据
    */
-  async function takeSnapshot(name: string, gc: boolean): Promise<Snapshot> {
+  async function takeSnapshot(name: string, gc: boolean): Promise<MemorySnapshot> {
     const profile = await client.getAllocationProfile(undefined, gc);
 
     const validMembers = profile.members.filter((m) => m.class?.name);
@@ -98,7 +82,7 @@ export function registerSnapshotDiffTools(
 
       try {
         const snapshot = await takeSnapshot(name, forceGC);
-        snapshots.set(name, snapshot);
+        snapshotStore.save(snapshot);
 
         return {
           content: [
@@ -111,7 +95,7 @@ export function registerSnapshotDiffTools(
                 `  Classes tracked: ${snapshot.memory.topClasses.length}`,
                 `  Time: ${new Date(snapshot.timestamp).toLocaleTimeString()}`,
                 "",
-                `Saved snapshots: ${Array.from(snapshots.keys()).join(", ")}`,
+                `Saved snapshots: ${snapshotStore.names().join(", ")}`,
                 "",
                 "Take another snapshot after your change, then use `compare_snapshots` to see the diff.",
               ].join("\n"),
@@ -144,15 +128,15 @@ export function registerSnapshotDiffTools(
       },
     },
     async ({ before, after }) => {
-      const snap1 = snapshots.get(before);
-      const snap2 = snapshots.get(after);
+      const snap1 = snapshotStore.get(before);
+      const snap2 = snapshotStore.get(after);
 
       if (!snap1) {
         return {
           content: [
             {
               type: "text" as const,
-              text: `Snapshot "${before}" not found. Available: ${Array.from(snapshots.keys()).join(", ") || "none"}`,
+              text: `Snapshot "${before}" not found. Available: ${snapshotStore.names().join(", ") || "none"}`,
             },
           ],
           isError: true,
@@ -164,7 +148,7 @@ export function registerSnapshotDiffTools(
           content: [
             {
               type: "text" as const,
-              text: `Snapshot "${after}" not found. Available: ${Array.from(snapshots.keys()).join(", ") || "none"}`,
+              text: `Snapshot "${after}" not found. Available: ${snapshotStore.names().join(", ") || "none"}`,
             },
           ],
           isError: true,
@@ -289,7 +273,7 @@ export function registerSnapshotDiffTools(
       description: "List all saved memory snapshots available for comparison.",
     },
     async () => {
-      if (snapshots.size === 0) {
+      if (snapshotStore.size === 0) {
         return {
           content: [
             {
@@ -301,9 +285,9 @@ export function registerSnapshotDiffTools(
       }
 
       const lines = ["Saved snapshots:", ""];
-      for (const [name, snap] of snapshots) {
+      for (const snap of snapshotStore.list()) {
         lines.push(
-          `  • "${name}" — ${formatBytes(snap.memory.heapUsage)} heap, ${new Date(snap.timestamp).toLocaleTimeString()}`
+          `  • "${snap.name}" — ${formatBytes(snap.memory.heapUsage)} heap, ${new Date(snap.timestamp).toLocaleTimeString()}`
         );
       }
 

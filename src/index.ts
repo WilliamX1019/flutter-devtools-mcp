@@ -5,6 +5,8 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { FlutterVmServiceClient } from "./services/vm-service-client.js";
 import { Profiler } from "./services/profiler.js";
 import { DiagnosticSessionStore } from "./services/diagnostic-session.js";
+import { MemorySnapshotStore } from "./services/memory-snapshot-store.js";
+import { RuntimeHealthStore } from "./services/runtime-health-store.js";
 import { registerConnectionTools } from "./tools/connection.js";
 import { registerWidgetTreeTools } from "./tools/widget-tree.js";
 import { registerProfilingTools } from "./tools/profiling.js";
@@ -16,6 +18,8 @@ import { registerNetworkTools } from "./tools/network.js";
 import { registerSnapshotDiffTools } from "./tools/snapshot-diff.js";
 import { registerRuntimeHealthTools } from "./tools/runtime-health.js";
 import { registerDiagnosticSessionTools } from "./tools/diagnostic-session.js";
+import { registerDiagnosticResources } from "./resources/diagnostic-resources.js";
+import { registerDiagnosticPrompts } from "./prompts/diagnostic-prompts.js";
 
 /**
  * Flutter DevTools MCP Server
@@ -38,15 +42,27 @@ const vmClient = new FlutterVmServiceClient();
  */
 const profiler = new Profiler(vmClient);
 const diagnosticSessions = new DiagnosticSessionStore();
+const memorySnapshots = new MemorySnapshotStore();
+const runtimeHealth = new RuntimeHealthStore();
 
 // 注册发现和环境探测工具
 registerDiscoverTools(server, vmClient);
 // 注册诊断会话工具，用于将多次工具调用组织成可复测的调查过程
 registerDiagnosticSessionTools(server, diagnosticSessions);
+// 注册 Resources 和 Prompts，供 Agent 读取状态并套用专家诊断流程
+registerDiagnosticResources(
+  server,
+  vmClient,
+  profiler,
+  diagnosticSessions,
+  memorySnapshots,
+  runtimeHealth
+);
+registerDiagnosticPrompts(server);
 // 注册设备连接和状态工具
 registerConnectionTools(server, vmClient);
 // 注册运行时健康检查工具，作为 AI Agent 的首个诊断入口
-registerRuntimeHealthTools(server, vmClient);
+registerRuntimeHealthTools(server, vmClient, runtimeHealth);
 // 注册 Widget 树检查和操作工具
 registerWidgetTreeTools(server, vmClient);
 // 注册性能剖析工具
@@ -58,7 +74,7 @@ registerRebuildTrackerTools(server, vmClient);
 // 注册网络请求拦截和分析工具
 registerNetworkTools(server, vmClient);
 // 注册快照对比工具
-registerSnapshotDiffTools(server, vmClient);
+registerSnapshotDiffTools(server, vmClient, memorySnapshots);
 // 注册调试操作工具 (如热重载、热重启等)
 registerDebugActionTools(server, vmClient);
 

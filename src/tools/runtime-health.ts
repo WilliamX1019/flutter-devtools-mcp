@@ -13,6 +13,7 @@ import {
 } from "../utils/diagnostic-findings.js";
 import { collectWidgetStats, WidgetStats } from "../utils/widget-stats.js";
 import { DiagnosticFinding } from "../types/diagnostics.js";
+import { RuntimeHealthStore } from "../services/runtime-health-store.js";
 
 function summarizeMemory(profile: AllocationProfile) {
   const { heapUsage, heapCapacity, externalUsage } = profile.memoryUsage;
@@ -182,7 +183,8 @@ function buildRuntimeFindings(args: {
 
 export function registerRuntimeHealthTools(
   server: McpServer,
-  client: FlutterVmServiceClient
+  client: FlutterVmServiceClient,
+  runtimeHealthStore: RuntimeHealthStore = new RuntimeHealthStore()
 ) {
   server.registerTool(
     "runtime_health_check",
@@ -345,6 +347,38 @@ export function registerRuntimeHealthTools(
           widgetStats,
           heapUtilization: memorySummary?.heapUtilization,
           extensions: extStatus,
+        });
+
+        runtimeHealthStore.save({
+          timestamp: Date.now(),
+          mode,
+          forceGC,
+          widgetDepth,
+          connection: {
+            connected: true,
+            vmServiceUri: client.vmServiceUri ?? undefined,
+            process: {
+              pid: vmInfo.pid,
+              operatingSystem: vmInfo.operatingSystem,
+              targetCPU: vmInfo.targetCPU,
+              dartVersion: vmInfo.version,
+            },
+            mainIsolate: {
+              id: mainIsolate?.id,
+              name: mainIsolate?.name,
+              pauseState,
+              rootLibrary: isolate.rootLib?.uri,
+            },
+            displayRefreshRate: fps,
+          },
+          serviceExtensions: {
+            ...extStatus,
+            total: extensions.length,
+          },
+          widgetStats,
+          memory: memorySummary,
+          nextSteps,
+          findings,
         });
 
         lines.push(
