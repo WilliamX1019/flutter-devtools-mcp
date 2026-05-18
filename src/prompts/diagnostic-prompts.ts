@@ -140,8 +140,9 @@ export function registerDiagnosticPrompts(server: McpServer) {
           "1. Run hot_reload unless the change requires hot_restart.",
           "2. Repeat the exact same diagnostic tool sequence used before the edit.",
           "3. Record the result as a verification observation.",
-          "4. Compare key metrics: jank percentage, max frame time, rebuild count, heap delta, network duration, or screenshot evidence.",
-          "5. Mark the result as improved, regressed, unchanged, or inconclusive based on metrics.",
+          "4. Run compare_diagnostic_runs for the session.",
+          "5. Compare key metrics: jank percentage, max frame time, rebuild count, heap delta, network duration, or screenshot evidence.",
+          "6. Mark the result as improved, regressed, unchanged, or inconclusive based on metrics.",
         ].join("\n")
       )
   );

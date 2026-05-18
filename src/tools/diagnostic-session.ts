@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { compareDiagnosticRuns } from "../services/diagnostic-comparison.js";
 import { DiagnosticSessionStore } from "../services/diagnostic-session.js";
 import {
   DiagnosticCategory,
@@ -142,6 +143,68 @@ export function registerDiagnosticSessionTools(
             {
               type: "text" as const,
               text: `Failed to record diagnostic observation: ${error instanceof Error ? error.message : String(error)}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  server.registerTool(
+    "compare_diagnostic_runs",
+    {
+      description:
+        "Compare before/after observations in a diagnostic session and return a verdict. Defaults to baseline vs latest verification run.",
+      inputSchema: {
+        sessionId: z.string().describe("Diagnostic session ID."),
+        beforeObservationId: z
+          .string()
+          .optional()
+          .describe(
+            "Optional before observation ID. Defaults to the session baseline."
+          ),
+        afterObservationId: z
+          .string()
+          .optional()
+          .describe(
+            "Optional after observation ID. Defaults to the latest verification run."
+          ),
+      },
+    },
+    async ({ sessionId, beforeObservationId, afterObservationId }) => {
+      const session = store.get(sessionId);
+      if (!session) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `Diagnostic session not found: ${sessionId}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      try {
+        const comparison = compareDiagnosticRuns(session, {
+          beforeObservationId,
+          afterObservationId,
+        });
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: JSON.stringify(comparison, null, 2),
+            },
+          ],
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `Failed to compare diagnostic runs: ${error instanceof Error ? error.message : String(error)}`,
             },
           ],
           isError: true,

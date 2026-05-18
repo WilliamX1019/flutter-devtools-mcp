@@ -57,3 +57,30 @@ export interface DiagnosticSession {
   verificationRuns: DiagnosticObservation[];
   notes: string[];
 }
+
+export interface DiagnosticMetricComparison {
+  key: string;
+  name: string;
+  category: DiagnosticCategory;
+  before: DiagnosticMetric;
+  after: DiagnosticMetric;
+  delta: number;
+  deltaPercent: number | null;
+  verdict: DiagnosticVerdict;
+  location?: DiagnosticLocation;
+  title: string;
+}
+
+export interface DiagnosticRunComparison {
+  sessionId: string;
+  beforeObservationId: string;
+  afterObservationId: string;
+  verdict: DiagnosticVerdict;
+  summary: string;
+  metricComparisons: DiagnosticMetricComparison[];
+  beforeFindingCount: number;
+  afterFindingCount: number;
+  resolvedFindingIds: string[];
+  newFindingIds: string[];
+  unchangedFindingIds: string[];
+}

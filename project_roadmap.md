@@ -59,7 +59,7 @@ graph LR
 | 分析引擎 | `src/services/profiler.ts` | 解析 Timeline，生成帧率、阶段耗时、CPU 热点分析 |
 | 工具层 | `src/tools/*.ts` | 面向 AI Agent 暴露 MCP Tools |
 
-### 当前工具清单（26 个）
+### 当前工具清单（27 个）
 
 | 类别 | 工具名 | 状态 |
 |------|--------|------|
@@ -70,7 +70,7 @@ graph LR
 | 内存 | `get_memory_snapshot`, `save_snapshot`, `compare_snapshots`, `list_snapshots` | 已具备 |
 | 网络 | `start_network_capture`, `stop_network_capture` | 已具备 |
 | 调试动作 | `hot_reload`, `hot_restart`, `take_screenshot`, `toggle_debug_paint`, `evaluate_expression` | 已具备 |
-| 诊断会话 | `start_diagnostic_session`, `record_diagnostic_observation`, `list_diagnostic_sessions`, `end_diagnostic_session` | 已具备 |
+| 诊断会话 | `start_diagnostic_session`, `record_diagnostic_observation`, `compare_diagnostic_runs`, `list_diagnostic_sessions`, `end_diagnostic_session` | 已具备 |
 
 ### 当前 MCP Resources / Prompts
 
@@ -304,18 +304,16 @@ interface DiagnosticFinding {
 
 #### Task 2.3 — 前后对比能力
 
+- **状态**：已完成。
 - **目标**：验证修复是否有效，而不是只判断代码是否“看起来合理”。
-- **新增工具建议**：
+- **新增工具**：
   - `compare_diagnostic_runs`
 - **比较维度**：
-  - Jank rate。
-  - P90/P99 frame time。
-  - Top rebuild count。
-  - Heap delta。
-  - Network latency / size。
-  - Screenshot before/after。
+  - 已支持：结构化 finding 中的 Jank rate、build phase、CPU hotspot、Top rebuild count、heap utilization 等数值 metric。
+  - 后续扩展：P90/P99 frame time、Heap delta、Network latency / size、Screenshot before/after。
 - **验收**：
   - 对同一 session 中的 before/after observation 输出 verdict：`improved`、`regressed`、`unchanged`、`inconclusive`。
+  - 默认比较 baseline 与最新 verification，也支持显式指定 before/after observation ID。
 
 ---
 
@@ -461,7 +459,7 @@ interface DiagnosticFinding {
 | Batch 2 | P0 | Task 1.2 | 已完成：测试框架、format、Widget 统计、Profiler Timeline 分析单测 |
 | Batch 3 | P0 | Task 2.1 + Task 2.2 | 已完成：建立诊断会话和结构化 finding schema |
 | Batch 4 | P1 | Task 3.1 + Task 3.2 | 已完成：增加 MCP Resources 和 Prompts |
-| Batch 5 | P1 | Task 2.3 | 做 before/after 对比，形成验证闭环 |
+| Batch 5 | P1 | Task 2.3 | 已完成：做 before/after 对比，形成验证闭环 |
 | Batch 6 | P1 | Task 4.1 + Task 4.4 | 强化性能诊断和视觉验证 |
 | Batch 7 | P2 | Task 3.3 + Task 5.1 | 增加异步通知和持续监控 |
 | Batch 8 | P2 | Task 4.2 + Task 4.3 + Task 5.2 | 补齐 shader、network、report |
@@ -469,9 +467,9 @@ interface DiagnosticFinding {
 
 ### 最近三步
 
-1. **先做 Task 2.3**：补 before/after 对比，让 Agent 能验证修复是否真的改善。
-2. **再做 Task 4.1 / 4.4**：强化 Timeline 分析可靠性和视觉验证能力。
-3. **随后做 Task 3.3 / 5.1**：引入异步通知和持续监控，让 Agent 能在运行时事件发生时主动响应。
+1. **先做 Task 4.1 / 4.4**：强化 Timeline 分析可靠性和视觉验证能力。
+2. **再做 Task 3.3 / 5.1**：引入异步通知和持续监控，让 Agent 能在运行时事件发生时主动响应。
+3. **随后做 Task 4.2 / 4.3 / 5.2**：补齐 shader、network、report，提升专项诊断覆盖面。
 
 ---
 
