@@ -48,6 +48,37 @@ describe("analyzeFrames", () => {
     expect(result.maxFrameTimeMs).toBe(18);
     expect(result.jankFrames).toBe(1);
   });
+
+  it("pairs begin and end frame events by thread and name", () => {
+    const result = analyzeFrames(
+      [
+        event({ name: "Frame", ph: "B", ts: 1000, tid: 1 }),
+        event({ name: "Frame", ph: "B", ts: 2000, tid: 2 }),
+        event({ name: "Frame", ph: "E", ts: 12000, tid: 2 }),
+        event({ name: "Frame", ph: "E", ts: 31000, tid: 1 }),
+      ],
+      16.67
+    );
+
+    expect(result.totalFrames).toBe(2);
+    expect(result.maxFrameTimeMs).toBe(30);
+    expect(result.averageFrameTimeMs).toBe(20);
+  });
+
+  it("ignores unpaired and abnormal frame durations", () => {
+    const result = analyzeFrames(
+      [
+        event({ name: "Frame", ph: "E", ts: 1000 }),
+        event({ name: "Frame", ph: "B", ts: 2000 }),
+        event({ name: "Frame", ph: "E", ts: 1_500_000 }),
+        event({ name: "Frame", ph: "X", ts: 3000, dur: 12_000 }),
+      ],
+      16.67
+    );
+
+    expect(result.totalFrames).toBe(1);
+    expect(result.maxFrameTimeMs).toBe(12);
+  });
 });
 
 describe("findCpuHotspots", () => {
@@ -84,6 +115,38 @@ describe("analyzePhase", () => {
       maxTimeMs: 12,
       count: 1,
     });
+  });
+
+  it("uses stack pairing for nested phase events on the same thread", () => {
+    const result = analyzePhase(
+      [
+        event({ name: "buildScope", ph: "B", ts: 1000, tid: 1 }),
+        event({ name: "buildScope", ph: "B", ts: 2000, tid: 1 }),
+        event({ name: "buildScope", ph: "E", ts: 7000, tid: 1 }),
+        event({ name: "buildScope", ph: "E", ts: 15000, tid: 1 }),
+      ],
+      "Build"
+    );
+
+    expect(result).toEqual({
+      totalTimeMs: 19,
+      avgTimeMs: 9.5,
+      maxTimeMs: 14,
+      count: 2,
+    });
+  });
+
+  it("does not pair phase begin and end events across threads", () => {
+    const result = analyzePhase(
+      [
+        event({ name: "performLayout", ph: "B", ts: 1000, tid: 1 }),
+        event({ name: "performLayout", ph: "E", ts: 9000, tid: 2 }),
+      ],
+      "Layout"
+    );
+
+    expect(result.count).toBe(0);
+    expect(result.maxTimeMs).toBe(0);
   });
 });
 

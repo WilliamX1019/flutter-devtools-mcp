@@ -57,6 +57,9 @@ export interface ProfilingResult {
 
 type PhaseName = "Build" | "Layout" | "Paint";
 
+const MAX_FRAME_DURATION_MS = 1000;
+const MAX_PHASE_DURATION_MS = 5000;
+
 const PHASE_PATTERNS: Record<PhaseName, string[]> = {
   Build: [
     "build",
@@ -175,31 +178,11 @@ export function analyzeFrames(
   events: TimelineEvent[],
   targetFrameTimeMs: number
 ): FrameAnalysis {
-  const frameDurations: number[] = [];
-
-  const completeDurationEvents = events.filter(
-    (e) => e.ph === "X" && e.dur !== undefined && isFrameEvent(e.name)
+  const frameDurations = collectDurations(
+    events,
+    (event) => isFrameEvent(event.name),
+    MAX_FRAME_DURATION_MS
   );
-
-  for (const event of completeDurationEvents) {
-    frameDurations.push(event.dur! / 1000);
-  }
-
-  const frameBeginEvents = events
-    .filter((e) => e.ph === "B" && isFrameEvent(e.name))
-    .sort((a, b) => a.ts - b.ts);
-
-  const frameEndEvents = events
-    .filter((e) => e.ph === "E" && isFrameEvent(e.name))
-    .sort((a, b) => a.ts - b.ts);
-
-  const minLen = Math.min(frameBeginEvents.length, frameEndEvents.length);
-  for (let i = 0; i < minLen; i++) {
-    const duration = (frameEndEvents[i].ts - frameBeginEvents[i].ts) / 1000;
-    if (duration > 0 && duration < 1000) {
-      frameDurations.push(duration);
-    }
-  }
 
   if (frameDurations.length === 0) {
     return {
@@ -279,27 +262,11 @@ export function analyzePhase(
   events: TimelineEvent[],
   phaseName: PhaseName
 ): PhaseAnalysis {
-  const completeDurations = events
-    .filter(
-      (e) => e.ph === "X" && e.dur !== undefined && matchesPhase(e.name, phaseName)
-    )
-    .map((e) => e.dur! / 1000);
-
-  const beginEvents = events
-    .filter((e) => e.ph === "B" && matchesPhase(e.name, phaseName))
-    .sort((a, b) => a.ts - b.ts);
-  const endEvents = events
-    .filter((e) => e.ph === "E" && matchesPhase(e.name, phaseName))
-    .sort((a, b) => a.ts - b.ts);
-
-  const pairedDurations: number[] = [];
-  const minLen = Math.min(beginEvents.length, endEvents.length);
-  for (let i = 0; i < minLen; i++) {
-    const dur = (endEvents[i].ts - beginEvents[i].ts) / 1000;
-    if (dur > 0 && dur < 5000) pairedDurations.push(dur);
-  }
-
-  const durations = [...completeDurations, ...pairedDurations];
+  const durations = collectDurations(
+    events,
+    (event) => matchesPhase(event.name, phaseName),
+    MAX_PHASE_DURATION_MS
+  );
   const total = durations.reduce((a, b) => a + b, 0);
   const max = durations.length > 0 ? Math.max(...durations) : 0;
   const avg = durations.length > 0 ? total / durations.length : 0;
@@ -310,6 +277,58 @@ export function analyzePhase(
     maxTimeMs: Math.round(max * 100) / 100,
     count: durations.length,
   };
+}
+
+function collectDurations(
+  events: TimelineEvent[],
+  matches: (event: TimelineEvent) => boolean,
+  maxDurationMs: number
+): number[] {
+  const durations: number[] = [];
+  const beginStacks = new Map<string, TimelineEvent[]>();
+
+  const sortedEvents = [...events].sort((a, b) => a.ts - b.ts);
+
+  for (const event of sortedEvents) {
+    if (!matches(event)) continue;
+
+    if (event.ph === "X" && event.dur !== undefined) {
+      const durationMs = event.dur / 1000;
+      if (isValidDuration(durationMs, maxDurationMs)) {
+        durations.push(durationMs);
+      }
+      continue;
+    }
+
+    if (event.ph === "B") {
+      const key = pairKey(event);
+      const stack = beginStacks.get(key) ?? [];
+      stack.push(event);
+      beginStacks.set(key, stack);
+      continue;
+    }
+
+    if (event.ph === "E") {
+      const stack = beginStacks.get(pairKey(event));
+      const begin = stack?.pop();
+      if (!begin) continue;
+
+      const durationMs = (event.ts - begin.ts) / 1000;
+      if (isValidDuration(durationMs, maxDurationMs)) {
+        durations.push(durationMs);
+      }
+    }
+  }
+
+  return durations;
+}
+
+function pairKey(event: TimelineEvent): string {
+  return `${event.tid}:${event.name}`;
+}
+
+function isValidDuration(durationMs: number, maxDurationMs: number): boolean {
+  return durationMs > 0 && durationMs < maxDurationMs;
 }
 
 function generateSummary(

@@ -368,13 +368,15 @@ interface DiagnosticFinding {
 
 #### Task 4.1 — Profiler 帧配对算法改进
 
+- **状态**：已完成。
 - **目标**：修复 Begin/End 按 index 配对可能错配的问题。
 - **实现要点**：
-  - 优先使用 `ph: "X"` duration event。
-  - Begin/End 改为 `tid` + event name + stack 配对。
-  - 过滤异常帧。
+  - 已优先使用 `ph: "X"` duration event。
+  - Begin/End 已改为 `tid` + event name + stack 配对。
+  - 已过滤异常帧和异常 phase duration。
 - **验收**：
   - 多线程 Timeline 下不出现负时长或异常大帧。
+  - 已覆盖跨线程、嵌套 Begin/End、异常 duration 的单元测试。
 
 #### Task 4.2 — Shader Compilation Jank Detection
 
@@ -460,14 +462,14 @@ interface DiagnosticFinding {
 | Batch 3 | P0 | Task 2.1 + Task 2.2 | 已完成：建立诊断会话和结构化 finding schema |
 | Batch 4 | P1 | Task 3.1 + Task 3.2 | 已完成：增加 MCP Resources 和 Prompts |
 | Batch 5 | P1 | Task 2.3 | 已完成：做 before/after 对比，形成验证闭环 |
-| Batch 6 | P1 | Task 4.1 + Task 4.4 | 强化性能诊断和视觉验证 |
+| Batch 6 | P1 | Task 4.1 + Task 4.4 | 进行中：Task 4.1 已完成，下一步强化视觉验证 |
 | Batch 7 | P2 | Task 3.3 + Task 5.1 | 增加异步通知和持续监控 |
 | Batch 8 | P2 | Task 4.2 + Task 4.3 + Task 5.2 | 补齐 shader、network、report |
 | Batch 9 | P2 | Task 5.3 | 用 demo app 做端到端回归 |
 
 ### 最近三步
 
-1. **先做 Task 4.1 / 4.4**：强化 Timeline 分析可靠性和视觉验证能力。
+1. **先做 Task 4.4**：让截图可落盘并支持 before/after 视觉验证。
 2. **再做 Task 3.3 / 5.1**：引入异步通知和持续监控，让 Agent 能在运行时事件发生时主动响应。
 3. **随后做 Task 4.2 / 4.3 / 5.2**：补齐 shader、network、report，提升专项诊断覆盖面。
 
