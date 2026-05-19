@@ -1,7 +1,13 @@
 import { z } from "zod";
+import { mkdir, writeFile } from "node:fs/promises";
+import { dirname, resolve } from "node:path";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { compareDiagnosticRuns } from "../services/diagnostic-comparison.js";
 import { DiagnosticSessionStore } from "../services/diagnostic-session.js";
+import {
+  DiagnosticReportFormat,
+  renderDiagnosticReport,
+} from "../services/report-export.js";
 import {
   DiagnosticCategory,
   DiagnosticFinding,
@@ -205,6 +211,84 @@ export function registerDiagnosticSessionTools(
             {
               type: "text" as const,
               text: `Failed to compare diagnostic runs: ${error instanceof Error ? error.message : String(error)}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  server.registerTool(
+    "export_report",
+    {
+      description:
+        "Export a diagnostic session as a Markdown or HTML report with baseline, findings, before/after metrics, recommendations, and verification verdict.",
+      inputSchema: {
+        sessionId: z.string().describe("Diagnostic session ID."),
+        format: z
+          .enum(["markdown", "html"])
+          .default("markdown")
+          .describe("Report output format."),
+        outputPath: z
+          .string()
+          .optional()
+          .describe(
+            "Optional output path. Defaults to diagnostic-report-<sessionId>.md or .html in the current directory."
+          ),
+      },
+    },
+    async ({ sessionId, format, outputPath }) => {
+      const session = store.get(sessionId);
+      if (!session) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `Diagnostic session not found: ${sessionId}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      try {
+        const report = renderDiagnosticReport(
+          session,
+          format as DiagnosticReportFormat
+        );
+        const extension = format === "html" ? "html" : "md";
+        const targetPath = resolve(
+          outputPath ?? `diagnostic-report-${session.id}.${extension}`
+        );
+        await mkdir(dirname(targetPath), { recursive: true });
+        await writeFile(targetPath, report.content, "utf8");
+
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: JSON.stringify(
+                {
+                  status: "exported",
+                  sessionId,
+                  format,
+                  path: targetPath,
+                  verdict: report.comparison?.verdict ?? "inconclusive",
+                  bytes: Buffer.byteLength(report.content, "utf8"),
+                },
+                null,
+                2
+              ),
+            },
+          ],
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `Failed to export diagnostic report: ${error instanceof Error ? error.message : String(error)}`,
             },
           ],
           isError: true,

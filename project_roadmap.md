@@ -59,7 +59,7 @@ graph LR
 | 分析引擎 | `src/services/profiler.ts` | 解析 Timeline，生成帧率、阶段耗时、CPU 热点分析 |
 | 工具层 | `src/tools/*.ts` | 面向 AI Agent 暴露 MCP Tools |
 
-### 当前工具清单（31 个）
+### 当前工具清单（32 个）
 
 | 类别 | 工具名 | 状态 |
 |------|--------|------|
@@ -71,7 +71,7 @@ graph LR
 | 网络 | `start_network_capture`, `stop_network_capture` | 已具备 |
 | 持续监控 | `start_monitoring`, `get_monitoring_status`, `stop_monitoring` | 已具备 |
 | 调试动作 | `hot_reload`, `hot_restart`, `take_screenshot`, `compare_screenshots`, `toggle_debug_paint`, `evaluate_expression` | 已具备 |
-| 诊断会话 | `start_diagnostic_session`, `record_diagnostic_observation`, `compare_diagnostic_runs`, `list_diagnostic_sessions`, `end_diagnostic_session` | 已具备 |
+| 诊断会话 | `start_diagnostic_session`, `record_diagnostic_observation`, `compare_diagnostic_runs`, `export_report`, `list_diagnostic_sessions`, `end_diagnostic_session` | 已具备 |
 
 ### 当前 MCP Resources / Prompts
 
@@ -440,17 +440,19 @@ interface DiagnosticFinding {
 
 #### Task 5.2 — Export Reports
 
+- **状态**：已完成。
 - **目标**：生成 Markdown/HTML 诊断报告。
-- **新增工具建议**：
+- **新增工具**：
   - `export_report`
 - **报告内容**：
-  - Runtime baseline。
-  - Findings。
-  - Before/after metrics。
-  - 修复建议。
-  - 复测结论。
+  - 已包含 Runtime baseline。
+  - 已包含 Findings。
+  - 已包含 Before/after metrics。
+  - 已包含修复建议。
+  - 已包含复测结论。
 - **验收**：
   - 生成可读 `.md` 或 `.html` 文件。
+  - 已覆盖 Markdown/HTML 渲染和无 before/after 对比场景单元测试。
 
 #### Task 5.3 — Demo App 与真实场景回归
 
@@ -478,14 +480,14 @@ interface DiagnosticFinding {
 | Batch 5 | P1 | Task 2.3 | 已完成：做 before/after 对比，形成验证闭环 |
 | Batch 6 | P1 | Task 4.1 + Task 4.4 | 已完成：强化性能诊断和视觉验证 |
 | Batch 7 | P2 | Task 3.3 + Task 5.1 | 已完成：增加异步通知和持续监控 |
-| Batch 8 | P2 | Task 4.2 + Task 4.3 + Task 5.2 | 进行中：Task 4.2/4.3 已完成，下一步补齐 report |
+| Batch 8 | P2 | Task 4.2 + Task 4.3 + Task 5.2 | 已完成：补齐 shader、network、report |
 | Batch 9 | P2 | Task 5.3 | 用 demo app 做端到端回归 |
 
 ### 最近三步
 
-1. **先做 Task 5.2**：生成 Markdown/HTML 诊断报告，沉淀可分享的诊断结论。
-2. **再做 Task 5.3**：用 demo app 做端到端回归，校准工具输出质量。
-3. **随后做连接状态机增强**：补自动重连和断连恢复策略，提升长时间监控稳定性。
+1. **先做 Task 5.3**：用 demo app 做端到端回归，校准工具输出质量。
+2. **再做连接状态机增强**：补自动重连和断连恢复策略，提升长时间监控稳定性。
+3. **随后做报告样式增强**：把 HTML 报告升级为更适合分享的视觉版。
 
 ---
 

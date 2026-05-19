@@ -243,6 +243,11 @@ to call.
 | `get_monitoring_status` | Read retained monitoring alerts and trend counts |
 | `stop_monitoring` | Stop monitoring and return the alert summary |
 
+### Diagnostic Reports
+| Tool | Description |
+|------|-------------|
+| `export_report` | Export a diagnostic session as Markdown or HTML |
+
 ### Debug Actions
 | Tool | Description |
 |------|-------------|
