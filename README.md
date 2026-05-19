@@ -71,6 +71,10 @@ Instead of switching between your IDE and DevTools, just tell your AI assistant:
 - **Debug Paint** — toggle widget boundary visualization
 - **Expression Evaluation** — run Dart expressions in the live app
 
+### Runtime Diagnostics Demo
+- Reproducible scenarios for rebuild, memory, shader, network, layout, and report validation
+- See [`examples/runtime_diagnostics_demo`](examples/runtime_diagnostics_demo) for run steps and expected findings
+
 ## Quick Start
 
 ### Prerequisites

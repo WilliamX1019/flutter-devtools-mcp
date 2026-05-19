@@ -456,16 +456,18 @@ interface DiagnosticFinding {
 
 #### Task 5.3 — Demo App 与真实场景回归
 
+- **状态**：已完成。
 - **目标**：用可复现 Flutter 示例校准工具输出质量。
 - **场景**：
-  - 过度 rebuild。
-  - 未 dispose controller。
-  - 首帧 shader jank。
-  - 大图片内存压力。
-  - 慢网络 / 大响应体。
-  - 布局 overflow。
+  - 已覆盖过度 rebuild。
+  - 已覆盖未 dispose controller。
+  - 已覆盖首帧 shader jank。
+  - 已覆盖大图片/大对象内存压力。
+  - 已覆盖慢网络 / 大响应体。
+  - 已覆盖布局 overflow。
 - **验收**：
   - 每个场景有可复现步骤、预期 finding 和修复后验证结果。
+  - 已新增 `examples/runtime_diagnostics_demo`，包含 Flutter demo 源码、运行说明和端到端回归脚本。
 
 ---
 
@@ -481,13 +483,13 @@ interface DiagnosticFinding {
 | Batch 6 | P1 | Task 4.1 + Task 4.4 | 已完成：强化性能诊断和视觉验证 |
 | Batch 7 | P2 | Task 3.3 + Task 5.1 | 已完成：增加异步通知和持续监控 |
 | Batch 8 | P2 | Task 4.2 + Task 4.3 + Task 5.2 | 已完成：补齐 shader、network、report |
-| Batch 9 | P2 | Task 5.3 | 用 demo app 做端到端回归 |
+| Batch 9 | P2 | Task 5.3 | 已完成：用 demo app 做端到端回归 |
 
 ### 最近三步
 
-1. **先做 Task 5.3**：用 demo app 做端到端回归，校准工具输出质量。
-2. **再做连接状态机增强**：补自动重连和断连恢复策略，提升长时间监控稳定性。
-3. **随后做报告样式增强**：把 HTML 报告升级为更适合分享的视觉版。
+1. **先做连接状态机增强**：补自动重连和断连恢复策略，提升长时间监控稳定性。
+2. **再做报告样式增强**：把 HTML 报告升级为更适合分享的视觉版。
+3. **随后做 demo 自动化回归脚本**：把手工复现步骤沉淀成可运行的 smoke test。
 
 ---
 

@@ -7,3 +7,14 @@ debug-raw.ts
 test-client.ts
 test-screenshot.ts
 demo-output.ts
+
+# Generated Flutter demo artifacts
+examples/runtime_diagnostics_demo/.dart_tool/
+examples/runtime_diagnostics_demo/build/
+examples/runtime_diagnostics_demo/.metadata
+examples/runtime_diagnostics_demo/android/
+examples/runtime_diagnostics_demo/ios/
+examples/runtime_diagnostics_demo/linux/
+examples/runtime_diagnostics_demo/macos/
+examples/runtime_diagnostics_demo/web/
+examples/runtime_diagnostics_demo/windows/
