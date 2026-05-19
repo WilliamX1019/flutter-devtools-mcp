@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 import {
   analyzeFrames,
   analyzePhase,
+  analyzeShaders,
   analyzeTimeline,
   findCpuHotspots,
+  isShaderEvent,
 } from "../../src/services/profiling-analysis.js";
 import { TimelineEvent } from "../../src/services/vm-service-client.js";
 
@@ -150,6 +152,30 @@ describe("analyzePhase", () => {
   });
 });
 
+describe("analyzeShaders", () => {
+  it("detects shader and renderer pipeline compilation events", () => {
+    const result = analyzeShaders([
+      event({ name: "GrGLProgramBuilder::finalize", cat: "skia", dur: 24000 }),
+      event({ name: "Impeller CompilePipeline", cat: "flutter", dur: 42000 }),
+      event({ name: "buildScope", cat: "Dart", dur: 12000 }),
+    ]);
+
+    expect(result.shaderEventCount).toBe(2);
+    expect(result.jankyShaderEventCount).toBe(2);
+    expect(result.maxShaderTimeMs).toBe(42);
+    expect(result.topShaderEvents[0]).toMatchObject({
+      name: "Impeller CompilePipeline",
+      durationMs: 42,
+    });
+  });
+
+  it("matches shader signal names and categories", () => {
+    expect(isShaderEvent("compile", "Skia")).toBe(true);
+    expect(isShaderEvent("Impeller pipeline cache", "flutter")).toBe(true);
+    expect(isShaderEvent("buildScope", "Dart")).toBe(false);
+  });
+});
+
 describe("analyzeTimeline", () => {
   it("filters metadata events and returns actionable recommendations", () => {
     const result = analyzeTimeline(
@@ -168,5 +194,24 @@ describe("analyzeTimeline", () => {
     expect(result.recommendations).toContain(
       "HIGH: Build phase exceeds frame budget. Consider using const constructors, breaking up large widget trees, or using RepaintBoundary."
     );
+  });
+
+  it("adds shader jank summary and recommendations", () => {
+    const result = analyzeTimeline(
+      [
+        event({ name: "Frame", dur: 40000 }),
+        event({ name: "SkSL shader compile", cat: "Compiler", dur: 30000 }),
+      ],
+      1000,
+      16.67
+    );
+
+    expect(result.shaderAnalysis.jankyShaderEventCount).toBe(1);
+    expect(result.summary.some((line) => line.includes("shader/renderer"))).toBe(true);
+    expect(
+      result.recommendations.some((line) =>
+        line.includes("Shader or renderer pipeline compilation jank detected")
+      )
+    ).toBe(true);
   });
 });

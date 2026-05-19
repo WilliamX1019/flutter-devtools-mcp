@@ -28,6 +28,19 @@ export interface PhaseAnalysis {
   count: number;
 }
 
+export interface ShaderAnalysis {
+  totalShaderTimeMs: number;
+  avgShaderTimeMs: number;
+  maxShaderTimeMs: number;
+  shaderEventCount: number;
+  jankyShaderEventCount: number;
+  topShaderEvents: Array<{
+    name: string;
+    durationMs: number;
+    category: string;
+  }>;
+}
+
 export interface ProfilingResult {
   durationMs: number;
   totalEventsCollected: number;
@@ -51,6 +64,7 @@ export interface ProfilingResult {
     maxPaintTimeMs: number;
     paintCount: number;
   };
+  shaderAnalysis: ShaderAnalysis;
   summary: string[];
   recommendations: string[];
 }
@@ -59,6 +73,18 @@ type PhaseName = "Build" | "Layout" | "Paint";
 
 const MAX_FRAME_DURATION_MS = 1000;
 const MAX_PHASE_DURATION_MS = 5000;
+const SHADER_JANK_THRESHOLD_MS = 16;
+
+const SHADER_PATTERNS = [
+  "shader",
+  "skia",
+  "sksl",
+  "grgl",
+  "impeller",
+  "compilepipeline",
+  "pipelinecache",
+  "warmup",
+];
 
 const PHASE_PATTERNS: Record<PhaseName, string[]> = {
   Build: [
@@ -108,6 +134,7 @@ export function analyzeTimeline(
   const buildPhase = analyzePhase(realEvents, "Build");
   const layoutPhase = analyzePhase(realEvents, "Layout");
   const paintPhase = analyzePhase(realEvents, "Paint");
+  const shaderAnalysis = analyzeShaders(realEvents);
 
   const buildPhaseAnalysis = {
     totalBuildTimeMs: buildPhase.totalTimeMs,
@@ -131,6 +158,7 @@ export function analyzeTimeline(
   const summary = generateSummary(
     frameAnalysis,
     cpuHotspots,
+    shaderAnalysis,
     durationMs,
     events.length,
     realEvents.length
@@ -141,6 +169,7 @@ export function analyzeTimeline(
     buildPhaseAnalysis,
     layoutPhaseAnalysis,
     paintPhaseAnalysis,
+    shaderAnalysis,
     realEvents.length
   );
 
@@ -152,6 +181,7 @@ export function analyzeTimeline(
     buildPhaseAnalysis,
     layoutPhaseAnalysis,
     paintPhaseAnalysis,
+    shaderAnalysis,
     summary,
     recommendations,
   };
@@ -279,6 +309,41 @@ export function analyzePhase(
   };
 }
 
+export function isShaderEvent(name: string, category: string = ""): boolean {
+  const normalized = `${name} ${category}`.toLowerCase();
+  return SHADER_PATTERNS.some((pattern) => normalized.includes(pattern));
+}
+
+export function analyzeShaders(events: TimelineEvent[]): ShaderAnalysis {
+  const shaderEvents = events
+    .filter((event) => isShaderEvent(event.name, event.cat))
+    .flatMap((event) =>
+      collectDurations([event], () => true, MAX_PHASE_DURATION_MS).map(
+        (durationMs) => ({
+          name: event.name,
+          durationMs,
+          category: event.cat ?? "unknown",
+        })
+      )
+    )
+    .sort((a, b) => b.durationMs - a.durationMs);
+
+  const total = shaderEvents.reduce((sum, event) => sum + event.durationMs, 0);
+  const max = shaderEvents[0]?.durationMs ?? 0;
+  const avg = shaderEvents.length > 0 ? total / shaderEvents.length : 0;
+
+  return {
+    totalShaderTimeMs: Math.round(total * 100) / 100,
+    avgShaderTimeMs: Math.round(avg * 100) / 100,
+    maxShaderTimeMs: Math.round(max * 100) / 100,
+    shaderEventCount: shaderEvents.length,
+    jankyShaderEventCount: shaderEvents.filter(
+      (event) => event.durationMs > SHADER_JANK_THRESHOLD_MS
+    ).length,
+    topShaderEvents: shaderEvents.slice(0, 10),
+  };
+}
+
 function collectDurations(
   events: TimelineEvent[],
   matches: (event: TimelineEvent) => boolean,
@@ -334,6 +399,7 @@ function isValidDuration(durationMs: number, maxDurationMs: number): boolean {
 function generateSummary(
   frames: FrameAnalysis,
   hotspots: CpuHotspot[],
+  shaderAnalysis: ShaderAnalysis,
   durationMs: number,
   totalEvents: number = 0,
   realEvents: number = 0
@@ -373,6 +439,15 @@ function generateSummary(
     }
   }
 
+  if (shaderAnalysis.jankyShaderEventCount > 0) {
+    summary.push(
+      `🎨 ${shaderAnalysis.jankyShaderEventCount} shader/renderer compilation event(s) exceeded ${SHADER_JANK_THRESHOLD_MS}ms`
+    );
+    summary.push(
+      `  - Worst shader event: ${shaderAnalysis.maxShaderTimeMs.toFixed(1)}ms`
+    );
+  }
+
   return summary;
 }
 
@@ -382,6 +457,7 @@ function generateRecommendations(
   buildPhase: { buildCount: number; maxBuildTimeMs: number },
   layoutPhase: { layoutCount: number; maxLayoutTimeMs: number },
   paintPhase: { paintCount: number; maxPaintTimeMs: number },
+  shaderAnalysis: ShaderAnalysis,
   realEventCount: number = 0
 ): string[] {
   const recs: string[] = [];
@@ -426,6 +502,12 @@ function generateRecommendations(
   if (paintPhase.maxPaintTimeMs > 16) {
     recs.push(
       "HIGH: Paint phase is slow. Consider using RepaintBoundary to isolate repainting, or check for expensive custom painters."
+    );
+  }
+
+  if (shaderAnalysis.jankyShaderEventCount > 0) {
+    recs.push(
+      "HIGH: Shader or renderer pipeline compilation jank detected. Reproduce once to warm caches, consider SkSL warmup on older Flutter versions, pre-render complex effects before interaction, and reduce first-frame shader complexity."
     );
   }
 

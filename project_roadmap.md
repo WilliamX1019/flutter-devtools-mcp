@@ -385,13 +385,15 @@ interface DiagnosticFinding {
 
 #### Task 4.2 — Shader Compilation Jank Detection
 
+- **状态**：已完成。
 - **目标**：识别首次进入页面、动画或复杂绘制时的 shader 编译卡顿。
 - **实现要点**：
-  - 检测 Shader / Skia / GrGL / Impeller 相关 Timeline 事件。
-  - 在报告中单独输出 shader 区域。
-  - 给出 warmup 或预渲染建议。
+  - 已检测 Shader / Skia / SkSL / GrGL / Impeller 相关 Timeline 事件。
+  - Profiling 报告已单独输出 shader / renderer pipeline 区域。
+  - 已输出 warmup、预渲染、降低首帧 shader 复杂度等建议。
 - **验收**：
   - Profiling 报告可以区分普通 build/layout/paint 卡顿和 shader 编译卡顿。
+  - 已覆盖 shader 事件识别、统计和推荐语单元测试。
 
 #### Task 4.3 — Network Capture 增强
 
@@ -474,12 +476,12 @@ interface DiagnosticFinding {
 | Batch 5 | P1 | Task 2.3 | 已完成：做 before/after 对比，形成验证闭环 |
 | Batch 6 | P1 | Task 4.1 + Task 4.4 | 已完成：强化性能诊断和视觉验证 |
 | Batch 7 | P2 | Task 3.3 + Task 5.1 | 已完成：增加异步通知和持续监控 |
-| Batch 8 | P2 | Task 4.2 + Task 4.3 + Task 5.2 | 补齐 shader、network、report |
+| Batch 8 | P2 | Task 4.2 + Task 4.3 + Task 5.2 | 进行中：Task 4.2 已完成，下一步补齐 network/report |
 | Batch 9 | P2 | Task 5.3 | 用 demo app 做端到端回归 |
 
 ### 最近三步
 
-1. **先做 Task 4.2 / 4.3 / 5.2**：补齐 shader、network、report，提升专项诊断覆盖面。
+1. **先做 Task 4.3 / 5.2**：补齐 network/report，提升专项诊断覆盖面。
 2. **再做 Task 5.3**：用 demo app 做端到端回归，校准工具输出质量。
 3. **随后做连接状态机增强**：补自动重连和断连恢复策略，提升长时间监控稳定性。
 

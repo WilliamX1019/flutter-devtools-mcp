@@ -48,6 +48,25 @@ function buildProfilingFindings(result: Awaited<ReturnType<Profiler["stop"]>>) {
     });
   }
 
+  if (result.shaderAnalysis.jankyShaderEventCount > 0) {
+    findings.push({
+      id: createFindingId("performance", "shader-compilation-jank"),
+      severity: result.shaderAnalysis.maxShaderTimeMs > 50 ? "critical" : "high",
+      category: "performance",
+      title: "Shader or renderer pipeline compilation jank detected",
+      evidence: `${result.shaderAnalysis.jankyShaderEventCount} shader/renderer event(s) exceeded 16ms; worst event was ${result.shaderAnalysis.maxShaderTimeMs.toFixed(2)}ms.`,
+      metric: {
+        name: "maxShaderTimeMs",
+        value: Number(result.shaderAnalysis.maxShaderTimeMs.toFixed(2)),
+        unit: "ms",
+        threshold: 16,
+      },
+      recommendation:
+        "Warm the interaction path once, pre-render complex visual effects before animation, reduce first-frame shader complexity, or use SkSL warmup where applicable.",
+      nextTool: "start_profiling",
+    });
+  }
+
   for (const hotspot of result.cpuHotspots.filter(
     (h) => h.severity === "critical" || h.severity === "high"
   )) {
@@ -200,6 +219,26 @@ export function registerProfilingTools(
           `Paint:  avg ${result.paintPhaseAnalysis.avgPaintTimeMs.toFixed(2)}ms | max ${result.paintPhaseAnalysis.maxPaintTimeMs.toFixed(2)}ms | ${result.paintPhaseAnalysis.paintCount} calls`,
           "",
         ];
+
+        if (result.shaderAnalysis.shaderEventCount > 0) {
+          output.push("🎨 SHADER / RENDERER PIPELINE");
+          output.push("───────────────────────────────────────────────────────────");
+          output.push(
+            `Total shader time: ${result.shaderAnalysis.totalShaderTimeMs.toFixed(2)}ms`
+          );
+          output.push(
+            `Max shader event: ${result.shaderAnalysis.maxShaderTimeMs.toFixed(2)}ms`
+          );
+          output.push(
+            `Janky shader events: ${result.shaderAnalysis.jankyShaderEventCount} / ${result.shaderAnalysis.shaderEventCount}`
+          );
+          for (const event of result.shaderAnalysis.topShaderEvents.slice(0, 5)) {
+            output.push(
+              `  - ${event.name}: ${event.durationMs.toFixed(2)}ms [${event.category}]`
+            );
+          }
+          output.push("");
+        }
 
         if (result.cpuHotspots.length > 0) {
           output.push("🔥 CPU HOTSPOTS");
