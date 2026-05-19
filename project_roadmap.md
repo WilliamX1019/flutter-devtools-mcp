@@ -397,14 +397,16 @@ interface DiagnosticFinding {
 
 #### Task 4.3 — Network Capture 增强
 
+- **状态**：已完成。
 - **目标**：扩大 HTTP 观察范围，并明确边界。
 - **实现要点**：
-  - 补充 Timeline HTTP 事件解析。
-  - 增加 `includeHeaders` 可选参数。
-  - 当可能遗漏非 `dart:io` 流量时明确提示。
+  - 已补充 Timeline HTTP-like 事件解析。
+  - `start_network_capture` 已增加 `includeHeaders` 可选参数。
+  - 报告已明确提示可能遗漏 WebView、native SDK、platform channel、browser networking 等非 VM Service 可见流量。
 - **验收**：
   - 使用 `dart:io` 的请求稳定捕获。
   - 对 Dio/Retrofit 等场景给出明确能力边界，而不是误报“无请求”。
+  - 已覆盖 dart:io stream、Timeline HTTP、Dio/URLRequest 名称识别和合并逻辑单元测试。
 
 #### Task 4.4 — Screenshot 保存与视觉对比
 
@@ -476,12 +478,12 @@ interface DiagnosticFinding {
 | Batch 5 | P1 | Task 2.3 | 已完成：做 before/after 对比，形成验证闭环 |
 | Batch 6 | P1 | Task 4.1 + Task 4.4 | 已完成：强化性能诊断和视觉验证 |
 | Batch 7 | P2 | Task 3.3 + Task 5.1 | 已完成：增加异步通知和持续监控 |
-| Batch 8 | P2 | Task 4.2 + Task 4.3 + Task 5.2 | 进行中：Task 4.2 已完成，下一步补齐 network/report |
+| Batch 8 | P2 | Task 4.2 + Task 4.3 + Task 5.2 | 进行中：Task 4.2/4.3 已完成，下一步补齐 report |
 | Batch 9 | P2 | Task 5.3 | 用 demo app 做端到端回归 |
 
 ### 最近三步
 
-1. **先做 Task 4.3 / 5.2**：补齐 network/report，提升专项诊断覆盖面。
+1. **先做 Task 5.2**：生成 Markdown/HTML 诊断报告，沉淀可分享的诊断结论。
 2. **再做 Task 5.3**：用 demo app 做端到端回归，校准工具输出质量。
 3. **随后做连接状态机增强**：补自动重连和断连恢复策略，提升长时间监控稳定性。
 

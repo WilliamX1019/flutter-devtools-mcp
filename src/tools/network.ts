@@ -2,22 +2,12 @@ import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { FlutterVmServiceClient } from "../services/vm-service-client.js";
 import { formatBytes as formatReadableBytes, formatDuration } from "../utils/format.js";
-
-/**
- * HTTP 请求数据记录接口
- */
-interface HttpRequest {
-  id: string;
-  method: string;
-  uri: string;
-  startTime: number;
-  endTime?: number;
-  statusCode?: number;
-  requestSize?: number;
-  responseSize?: number;
-  contentType?: string;
-  error?: string;
-}
+import {
+  applyHttpStreamEvent,
+  HttpRequest,
+  mergeHttpRequests,
+  parseTimelineHttpRequests,
+} from "../services/network-analysis.js";
 
 const formatBytes = (bytes: number): string =>
   formatReadableBytes(bytes, { decimals: 1, maxUnit: "MB" });
@@ -34,64 +24,12 @@ export function registerNetworkTools(
   let capturing = false;
   let requests = new Map<string, HttpRequest>();
   let captureStartTime = 0;
+  let captureIncludeHeaders = false;
 
   const httpListener = (event: any) => {
-    if (!event) return;
-
-    const kind = event.extensionKind ?? event.kind;
-    const data = event.extensionData ?? event;
-
-    if (kind === "dart:io.httpClient.request.start" || kind === "HttpClientRequest") {
-      const id = data?.id?.toString() ?? data?.isolateId ?? `req_${Date.now()}`;
-      requests.set(id, {
-        id,
-        method: data?.method ?? "GET",
-        uri: data?.uri ?? data?.url ?? "unknown",
-        startTime: Date.now(),
-        requestSize: data?.contentLength ?? data?.requestSize,
-      });
-    }
-
-    if (kind === "dart:io.httpClient.request.finish" || kind === "HttpClientResponse") {
-      const id = data?.id?.toString() ?? data?.isolateId;
-      const req = id ? requests.get(id) : undefined;
-      if (req) {
-        req.endTime = Date.now();
-        req.statusCode = data?.statusCode ?? data?.status;
-        req.responseSize =
-          data?.contentLength ?? data?.responseSize ?? data?.compressionState?.length;
-        req.contentType = data?.contentType ?? data?.headers?.["content-type"];
-      }
-    }
-
-    if (kind === "dart:io.httpClient.request.error") {
-      const id = data?.id?.toString();
-      const req = id ? requests.get(id) : undefined;
-      if (req) {
-        req.endTime = Date.now();
-        req.error = data?.error ?? data?.message ?? "Unknown error";
-      }
-    }
-
-    if (kind === "Extension" && data?.extensionKind?.includes("http")) {
-      const extData = data.extensionData;
-      if (extData?.method && extData?.uri) {
-        const id = extData.id?.toString() ?? `ext_${Date.now()}`;
-        const existing = requests.get(id);
-        if (!existing) {
-          requests.set(id, {
-            id,
-            method: extData.method,
-            uri: extData.uri,
-            startTime: extData.startTime ?? Date.now(),
-            endTime: extData.endTime,
-            statusCode: extData.statusCode ?? extData.status,
-            responseSize: extData.responseSize ?? extData.contentLength,
-            contentType: extData.contentType,
-          });
-        }
-      }
-    }
+    applyHttpStreamEvent(requests, event, {
+      includeHeaders: captureIncludeHeaders,
+    });
   };
 
   // 注册 "start_network_capture" 工具：开启 HTTP 网络请求捕获
@@ -100,8 +38,16 @@ export function registerNetworkTools(
     {
       description:
         "Start capturing HTTP network traffic from the running Flutter app. After starting, use the app to trigger API calls, then call stop_network_capture to see all requests with timing, status codes, and sizes.",
+      inputSchema: {
+        includeHeaders: z
+          .boolean()
+          .default(false)
+          .describe(
+            "Include request/response headers when available. Disabled by default to avoid leaking sensitive values."
+          ),
+      },
     },
-    async () => {
+    async ({ includeHeaders }) => {
       if (!client.connected) {
         return {
           content: [
@@ -128,6 +74,7 @@ export function registerNetworkTools(
 
       requests = new Map();
       captureStartTime = Date.now();
+      captureIncludeHeaders = includeHeaders;
       capturing = true;
 
       client.on("stream:Extension", httpListener);
@@ -148,7 +95,12 @@ export function registerNetworkTools(
         content: [
           {
             type: "text" as const,
-            text: "✅ Network capture started. Use the app to trigger API calls, then call `stop_network_capture` to see the results.",
+            text: [
+              "✅ Network capture started. Use the app to trigger API calls, then call `stop_network_capture` to see the results.",
+              includeHeaders
+                ? "Headers will be included when available. Review output for sensitive values before sharing."
+                : "Headers are omitted by default. Restart capture with includeHeaders=true if header evidence is needed.",
+            ].join("\n"),
           },
         ],
       };
@@ -198,6 +150,16 @@ export function registerNetworkTools(
         // Best effort
       }
 
+      try {
+        const timeline = await client.getTimeline();
+        const timelineRequests = parseTimelineHttpRequests(timeline.traceEvents ?? [], {
+          includeHeaders: captureIncludeHeaders,
+        });
+        requests = mergeHttpRequests(requests, timelineRequests);
+      } catch {
+        // Timeline may be unavailable; stream-based capture still provides best effort data.
+      }
+
       const durationMs = Date.now() - captureStartTime;
       const allRequests = Array.from(requests.values());
 
@@ -212,7 +174,9 @@ export function registerNetworkTools(
                 "This can happen if:",
                 "• The app didn't make any network calls during capture",
                 "• HTTP timeline logging is not supported in this Flutter version",
-                "• The app uses a custom HTTP client that doesn't go through dart:io",
+                "• The app uses native/webview traffic or a custom client that does not emit VM Service HTTP timeline events",
+                "",
+                "Coverage: dart:io HTTP events plus Timeline HTTP-like events. Dio/Retrofit usually use dart:io on mobile/desktop, but native plugins, webviews, and platform channels may be invisible here.",
                 "",
                 "Try making the app load data (pull to refresh, navigate to a new screen).",
               ].join("\n"),
@@ -262,6 +226,10 @@ export function registerNetworkTools(
         `Total response size: ${formatBytes(totalSize)}`,
         `Average response time: ${formatDuration(avgDuration)}`,
         `Slowest request: ${formatDuration(maxDuration)}`,
+        `Coverage: dart:io HTTP events + Timeline HTTP-like events`,
+        captureIncludeHeaders
+          ? "Headers: included when available"
+          : "Headers: omitted (restart capture with includeHeaders=true if needed)",
         "",
         "📡 REQUESTS",
         "───────────────────────────────────────────────────────────",
@@ -283,8 +251,16 @@ export function registerNetworkTools(
         const size = req.responseSize ? formatBytes(req.responseSize) : "-";
 
         output.push(
-          `${status} ${req.method.padEnd(6)} ${duration.padStart(8)} | ${size.padStart(8)} | ${req.uri}`
+          `${status} ${req.method.padEnd(6)} ${duration.padStart(8)} | ${size.padStart(8)} | ${req.source.padEnd(8)} | ${req.uri}`
         );
+        if (captureIncludeHeaders) {
+          if (req.requestHeaders) {
+            output.push(`    request headers: ${JSON.stringify(req.requestHeaders)}`);
+          }
+          if (req.responseHeaders) {
+            output.push(`    response headers: ${JSON.stringify(req.responseHeaders)}`);
+          }
+        }
       }
 
       const slowRequests = completedRequests.filter(
@@ -315,6 +291,13 @@ export function registerNetworkTools(
           output.push(`• ERROR: ${req.method} ${req.uri} — ${req.error}`);
         }
       }
+
+      output.push("");
+      output.push("COVERAGE NOTE");
+      output.push("───────────────────────────────────────────────────────────");
+      output.push(
+        "This capture observes dart:io HTTP traffic and HTTP-like Timeline events. It may miss traffic from WebViews, native SDKs, platform channels, browser networking, or clients that do not emit VM Service timeline events."
+      );
 
       return {
         content: [

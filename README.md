@@ -233,7 +233,7 @@ to call.
 ### Network
 | Tool | Description |
 |------|-------------|
-| `start_network_capture` | Start capturing HTTP traffic |
+| `start_network_capture` | Start capturing HTTP traffic, optionally including headers |
 | `stop_network_capture` | Report: URLs, status codes, timing, sizes, errors |
 
 ### Runtime Monitoring
