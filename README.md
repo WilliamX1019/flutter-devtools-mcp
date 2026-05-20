@@ -208,6 +208,15 @@ For a fully tracked investigation, first create a diagnostic session and pass it
 `stop_tracking_rebuilds`. Use `observationRole: "baseline"` before the fix and
 `observationRole: "verification"` after hot reload.
 
+For a Chinese end-to-end workflow guide covering reconnect, diagnostic sessions,
+baseline capture, targeted tools, and before/after verification, see
+[`BEST_PRACTICES_ZH.md`](BEST_PRACTICES_ZH.md).
+
+For the current data relationship flow between the IDE Agent, MCP server, and
+running Flutter project, see
+[`ARCHITECTURE_FLOW_ZH.md`](ARCHITECTURE_FLOW_ZH.md). Keep this diagram updated
+whenever the MCP data flow changes.
+
 ## Tools Reference (33 tools)
 
 ### Discovery & Connection

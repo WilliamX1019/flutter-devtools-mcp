@@ -520,6 +520,7 @@ interface DiagnosticFinding {
 3. 不破坏现有工具名和必填参数。
 4. 文档同步更新。
 5. 工作区不混入无关文件。
+6. 如果改动影响 Agent、MCP Server、VM Service、Diagnostic Session 或真实 Flutter 项目之间的数据流转，必须同步更新 `ARCHITECTURE_FLOW_ZH.md`。
 
 ### 7.2 阶段验收
 
@@ -543,3 +544,4 @@ interface DiagnosticFinding {
 6. **测试策略**：新增/修改的公共函数应附带单元测试；难以测试的 VM Service 调用应抽出纯解析逻辑测试。
 7. **提交策略**：每个 Task 单独提交，commit message 使用 `feat(scope): description` 或 `fix(scope): description`。
 8. **工作区卫生**：不要提交本地日志、临时文件、构建产物和与任务无关的改动。
+9. **架构图同步**：新增/删除关键 Tool、Resource、Prompt、Session 字段、Runtime Monitor 事件或验证闭环时，必须同步更新 `ARCHITECTURE_FLOW_ZH.md`。
