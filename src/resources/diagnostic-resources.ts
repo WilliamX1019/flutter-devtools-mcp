@@ -37,9 +37,7 @@ export function registerDiagnosticResources(
     },
     async (uri) =>
       jsonResource(uri, {
-        connected: client.connected,
-        vmServiceUri: client.vmServiceUri,
-        mainIsolateId: client.mainIsolateId,
+        ...client.connectionStatus,
       })
   );
 

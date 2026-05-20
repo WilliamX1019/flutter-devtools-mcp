@@ -24,12 +24,41 @@ export function registerConnectionTools(
           .describe(
             "The VM Service URI of the running Flutter app (e.g., http://127.0.0.1:50000/AbCdEf=/)"
           ),
+        autoReconnect: z
+          .boolean()
+          .default(true)
+          .describe("Automatically reconnect if the VM Service socket closes."),
+        maxReconnectAttempts: z
+          .number()
+          .min(0)
+          .max(20)
+          .default(5)
+          .describe(
+            "Maximum automatic reconnect attempts after an unexpected disconnect."
+          ),
+        reconnectBaseDelayMs: z
+          .number()
+          .min(100)
+          .max(30000)
+          .default(1000)
+          .describe(
+            "Base reconnect delay in milliseconds. Backoff doubles per attempt."
+          ),
       },
     },
-    async ({ vmServiceUri }) => {
+    async ({
+      vmServiceUri,
+      autoReconnect,
+      maxReconnectAttempts,
+      reconnectBaseDelayMs,
+    }) => {
       try {
         // 尝试建立连接并获取 VM 信息
-        const vmInfo = await client.connect(vmServiceUri);
+        const vmInfo = await client.connect(vmServiceUri, {
+          autoReconnect,
+          maxReconnectAttempts,
+          reconnectBaseDelayMs,
+        });
         const mainIsolate = vmInfo.isolates.find((i) => !i.isSystemIsolate);
 
         return {
@@ -53,6 +82,7 @@ export function registerConnectionTools(
                       }
                     : null,
                   isolateCount: vmInfo.isolates.length,
+                  connection: client.connectionStatus,
                 },
                 null,
                 2
@@ -66,6 +96,63 @@ export function registerConnectionTools(
             {
               type: "text" as const,
               text: `Failed to connect: ${error instanceof Error ? error.message : String(error)}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  server.registerTool(
+    "reconnect",
+    {
+      description:
+        "Manually reconnect to the last known Flutter VM Service URI and re-enable automatic reconnect.",
+    },
+    async () => {
+      const vmServiceUri = client.vmServiceUri;
+      if (!vmServiceUri) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: "No previous VM Service URI is available. Use the `connect` tool first.",
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      try {
+        const vmInfo = await client.connect(vmServiceUri, { autoReconnect: true });
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: JSON.stringify(
+                {
+                  status: "reconnected",
+                  vm: {
+                    name: vmInfo.name,
+                    version: vmInfo.version,
+                    os: vmInfo.operatingSystem,
+                    pid: vmInfo.pid,
+                  },
+                  connection: client.connectionStatus,
+                },
+                null,
+                2
+              ),
+            },
+          ],
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `Failed to reconnect: ${error instanceof Error ? error.message : String(error)}`,
             },
           ],
           isError: true,
@@ -92,7 +179,7 @@ export function registerConnectionTools(
         content: [
           {
             type: "text" as const,
-            text: "Disconnected from Flutter app.",
+            text: "Disconnected from Flutter app. Automatic reconnect is disabled until `connect` or `reconnect` is called.",
           },
         ],
       };
@@ -160,6 +247,7 @@ export function registerConnectionTools(
                     name: i.name,
                     isSystem: i.isSystemIsolate,
                   })),
+                  connection: client.connectionStatus,
                 },
                 null,
                 2

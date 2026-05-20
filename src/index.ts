@@ -77,15 +77,15 @@ registerDiagnosticPrompts(server);
 // 注册设备连接和状态工具
 registerConnectionTools(server, vmClient);
 // 注册运行时健康检查工具，作为 AI Agent 的首个诊断入口
-registerRuntimeHealthTools(server, vmClient, runtimeHealth);
+registerRuntimeHealthTools(server, vmClient, runtimeHealth, diagnosticSessions);
 // 注册 Widget 树检查和操作工具
 registerWidgetTreeTools(server, vmClient);
 // 注册性能剖析工具
-registerProfilingTools(server, vmClient, profiler);
+registerProfilingTools(server, vmClient, profiler, diagnosticSessions);
 // 注册内存分析和堆栈检查工具
 registerMemoryTools(server, vmClient);
 // 注册组件重建追踪工具
-registerRebuildTrackerTools(server, vmClient);
+registerRebuildTrackerTools(server, vmClient, diagnosticSessions);
 // 注册网络请求拦截和分析工具
 registerNetworkTools(server, vmClient);
 // 注册持续监控工具，用于异步感知 jank、GC、异常和断连
@@ -107,6 +107,22 @@ vmClient.on("error", (err) => {
  */
 vmClient.on("disconnected", () => {
   console.error("[flutter-devtools-mcp] Disconnected from Flutter app VM Service");
+});
+
+vmClient.on("reconnecting", (event) => {
+  console.error(
+    `[flutter-devtools-mcp] Reconnecting to Flutter app VM Service (${event.attempt}/${event.maxAttempts}) in ${event.delayMs}ms`
+  );
+});
+
+vmClient.on("reconnected", () => {
+  console.error("[flutter-devtools-mcp] Reconnected to Flutter app VM Service");
+});
+
+vmClient.on("reconnect_failed", (event) => {
+  console.error(
+    `[flutter-devtools-mcp] Failed to reconnect to Flutter app VM Service after ${event.attempts} attempt(s): ${event.vmServiceUri}`
+  );
 });
 
 /**

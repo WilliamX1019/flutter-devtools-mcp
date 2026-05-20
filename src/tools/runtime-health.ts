@@ -14,6 +14,12 @@ import {
 import { collectWidgetStats, WidgetStats } from "../utils/widget-stats.js";
 import { DiagnosticFinding } from "../types/diagnostics.js";
 import { RuntimeHealthStore } from "../services/runtime-health-store.js";
+import { DiagnosticSessionStore } from "../services/diagnostic-session.js";
+import {
+  appendAutoRecordStatus,
+  autoRecordDiagnosticObservation,
+  DiagnosticObservationRole,
+} from "../utils/diagnostic-recording.js";
 
 function summarizeMemory(profile: AllocationProfile) {
   const { heapUsage, heapCapacity, externalUsage } = profile.memoryUsage;
@@ -184,7 +190,8 @@ function buildRuntimeFindings(args: {
 export function registerRuntimeHealthTools(
   server: McpServer,
   client: FlutterVmServiceClient,
-  runtimeHealthStore: RuntimeHealthStore = new RuntimeHealthStore()
+  runtimeHealthStore: RuntimeHealthStore = new RuntimeHealthStore(),
+  diagnosticSessions?: DiagnosticSessionStore
 ) {
   server.registerTool(
     "runtime_health_check",
@@ -208,9 +215,28 @@ export function registerRuntimeHealthTools(
           .max(12)
           .default(4)
           .describe("Maximum widget depth for the shallow baseline."),
+        sessionId: z
+          .string()
+          .optional()
+          .describe("Optional diagnostic session ID to record this result into."),
+        observationRole: z
+          .enum(["baseline", "observation", "verification"])
+          .default("baseline")
+          .describe("How to classify this tool result inside the diagnostic session."),
+        observationLabel: z
+          .string()
+          .optional()
+          .describe("Optional label for this recorded diagnostic observation."),
       },
     },
-    async ({ mode, forceGC, widgetDepth }) => {
+    async ({
+      mode,
+      forceGC,
+      widgetDepth,
+      sessionId,
+      observationRole,
+      observationLabel,
+    }) => {
       if (!client.connected) {
         return {
           content: [
@@ -264,6 +290,7 @@ export function registerRuntimeHealthTools(
           "CONNECTION",
           "-----------------------------------------------------------",
           `Status: connected`,
+          `Connection state: ${client.connectionStatus.state}`,
           `VM Service URI: ${client.vmServiceUri ?? "unknown"}`,
           `Process: PID ${vmInfo.pid} on ${vmInfo.operatingSystem} (${vmInfo.targetCPU})`,
           `Dart VM: ${vmInfo.version}`,
@@ -389,6 +416,29 @@ export function registerRuntimeHealthTools(
         );
 
         appendDiagnosticFindings(lines, findings);
+        const reportText = lines.join("\n");
+        appendAutoRecordStatus(
+          lines,
+          autoRecordDiagnosticObservation({
+            store: diagnosticSessions,
+            sessionId,
+            observationRole: observationRole as DiagnosticObservationRole,
+            observationLabel,
+            sourceTool: "runtime_health_check",
+            text: reportText,
+            findings,
+            raw: {
+              mode,
+              forceGC,
+              widgetDepth,
+              connection: client.connectionStatus,
+              serviceExtensions: { ...extStatus, total: extensions.length },
+              widgetStats,
+              memory: memorySummary,
+              nextSteps,
+            },
+          })
+        );
 
         return {
           content: [{ type: "text" as const, text: lines.join("\n") }],

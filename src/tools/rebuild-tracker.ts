@@ -6,6 +6,12 @@ import {
   createFindingId,
 } from "../utils/diagnostic-findings.js";
 import { DiagnosticFinding } from "../types/diagnostics.js";
+import { DiagnosticSessionStore } from "../services/diagnostic-session.js";
+import {
+  appendAutoRecordStatus,
+  autoRecordDiagnosticObservation,
+  DiagnosticObservationRole,
+} from "../utils/diagnostic-recording.js";
 
 /**
  * 重建事件数据结构，反映来自 Flutter Framework 的重建通知
@@ -65,7 +71,8 @@ function buildRebuildFindings(entries: RebuildEntry[]): DiagnosticFinding[] {
  */
 export function registerRebuildTrackerTools(
   server: McpServer,
-  client: FlutterVmServiceClient
+  client: FlutterVmServiceClient,
+  diagnosticSessions?: DiagnosticSessionStore
 ) {
   let tracking = false;
   let rebuildCounts = new Map<number, number>();
@@ -179,9 +186,21 @@ export function registerRebuildTrackerTools(
           .max(100)
           .default(30)
           .describe("Number of top rebuilding widgets to show"),
+        sessionId: z
+          .string()
+          .optional()
+          .describe("Optional diagnostic session ID to record this result into."),
+        observationRole: z
+          .enum(["baseline", "observation", "verification"])
+          .default("observation")
+          .describe("How to classify this tool result inside the diagnostic session."),
+        observationLabel: z
+          .string()
+          .optional()
+          .describe("Optional label for this recorded diagnostic observation."),
       },
     },
-    async ({ topN }) => {
+    async ({ topN, sessionId, observationRole, observationLabel }) => {
       if (!client.connected) {
         return {
           content: [
@@ -335,7 +354,28 @@ export function registerRebuildTrackerTools(
           }
         }
 
-        appendDiagnosticFindings(output, buildRebuildFindings(entries));
+        const findings = buildRebuildFindings(entries);
+        appendDiagnosticFindings(output, findings);
+        const reportText = output.join("\n");
+        appendAutoRecordStatus(
+          output,
+          autoRecordDiagnosticObservation({
+            store: diagnosticSessions,
+            sessionId,
+            observationRole: observationRole as DiagnosticObservationRole,
+            observationLabel,
+            sourceTool: "stop_tracking_rebuilds",
+            text: reportText,
+            findings,
+            raw: {
+              durationMs,
+              totalRebuilds,
+              uniqueWidgets,
+              topN,
+              entries: entries.slice(0, topN),
+            },
+          })
+        );
 
         return {
           content: [

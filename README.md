@@ -25,6 +25,12 @@ Instead of switching between your IDE and DevTools, just tell your AI assistant:
 - Automatically find running Flutter apps on your machine
 - No manual URI copying — just say "connect to my Flutter app"
 - Scans processes, temp files, and common ports
+- Connection state machine with automatic reconnect for long-running diagnostics
+
+### Diagnostic Sessions
+- Group runtime health, profiling, rebuild, memory, network, and verification evidence into one investigation
+- Core tools can write directly into a diagnostic session with `sessionId`
+- Compare before/after observations to verify whether a fix actually improved runtime behavior
 
 ### Widget Tree Inspection
 - Get the complete widget hierarchy of any screen with source file locations
@@ -197,13 +203,19 @@ to call.
 
 > "Hot reload, then rerun the same diagnostic check and compare with the baseline"
 
-## Tools Reference (22 tools)
+For a fully tracked investigation, first create a diagnostic session and pass its
+`sessionId` to `runtime_health_check`, `stop_profiling`, or
+`stop_tracking_rebuilds`. Use `observationRole: "baseline"` before the fix and
+`observationRole: "verification"` after hot reload.
+
+## Tools Reference (33 tools)
 
 ### Discovery & Connection
 | Tool | Description |
 |------|-------------|
 | `discover_apps` | Auto-find running Flutter apps and connect |
-| `connect` | Connect to a Flutter app via VM Service URI |
+| `connect` | Connect to a Flutter app via VM Service URI with optional automatic reconnect |
+| `reconnect` | Reconnect to the last known VM Service URI |
 | `disconnect` | Disconnect from the app |
 | `get_app_info` | VM info, isolates, platform details, extensions |
 | `runtime_health_check` | Agent-oriented runtime baseline and recommended next diagnostic steps |
@@ -404,10 +416,12 @@ The MCP server wraps these low-level protocol calls into AI-agent-friendly tools
 - [x] Widget rebuild tracking with source locations
 - [x] Network traffic inspection
 - [x] Before/after snapshot comparison
-- [ ] Continuous monitoring mode (watch for jank in real-time)
+- [x] Continuous monitoring mode (watch for jank in real-time)
+- [x] Automatic reconnect after unexpected VM Service disconnects
+- [x] Automatic diagnostic session recording for core runtime tools
+- [x] Shader compilation jank detection
+- [x] Export reports as markdown/HTML
 - [ ] Integration test runner with performance baselines
-- [ ] Shader compilation jank detection
-- [ ] Export reports as markdown/HTML
 - [ ] npm publish for `npx flutter-devtools-mcp`
 
 ## Contributing

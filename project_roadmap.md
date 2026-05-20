@@ -160,7 +160,7 @@ Agent 修改代码前应尽量先拿到运行时证据：
 
 | # | 问题 | 位置 | 严重度 | 处理策略 |
 |---|------|------|--------|----------|
-| R1 | WebSocket 断开后无自动重连 | vm-service-client.ts | 高 | 增加连接状态机和可观测事件 |
+| R1 | WebSocket 断开后无自动重连 | vm-service-client.ts | 高 | 已完成：增加连接状态机、自动重连和可观测事件 |
 | R2 | App 发现对 macOS/Linux 临时目录兼容不足 | discover.ts | 中 | 使用 `os.tmpdir()` 和受控并发 |
 | R3 | Network 捕获依赖 `dart:io` | network.ts | 中 | 明确能力边界，补充 Timeline 解析和提示 |
 | R4 | Profiler Begin/End 配对按 index 匹配 | profiler.ts | 中 | 改为 `tid` + 栈式配对 |
@@ -169,7 +169,7 @@ Agent 修改代码前应尽量先拿到运行时证据：
 
 | # | 缺口 | 影响 | 处理策略 |
 |---|------|------|----------|
-| A1 | 无诊断会话模型 | 工具结果孤立，难以前后对比 | 增加 session/baseline/run 结构 |
+| A1 | 无诊断会话模型 | 工具结果孤立，难以前后对比 | 已完成：增加 session/baseline/run 结构，并让核心工具可自动写入 session |
 | A2 | 无 MCP Resources | Agent 无法主动读取连接状态和快照列表 | 暴露 connection/snapshots/profiling resources |
 | A3 | 无 MCP Prompts | 每次排查都靠 Agent 临场编排 | 内置卡顿、内存、布局、网络流程模板 |
 | A4 | 缺少结构化输出 | Agent 难以稳定定位源码和排序问题 | 引入统一 report schema |
@@ -469,6 +469,21 @@ interface DiagnosticFinding {
   - 每个场景有可复现步骤、预期 finding 和修复后验证结果。
   - 已新增 `examples/runtime_diagnostics_demo`，包含 Flutter demo 源码、运行说明和端到端回归脚本。
 
+#### Task 5.4 — 连接状态机与诊断自动归档
+
+- **状态**：已完成。
+- **目标**：把真实项目里最容易打断 Agent 调试闭环的两类问题补齐：长时间观察时 VM Service 断连，以及工具结果需要人工复制到诊断会话。
+- **实现要点**：
+  - `FlutterVmServiceClient` 已增加 `connecting / connected / reconnecting / disconnected` 状态机。
+  - `connect` 已增加 `autoReconnect`、`maxReconnectAttempts`、`reconnectBaseDelayMs` 可选参数。
+  - 新增 `reconnect` 工具，用于手动恢复到最近一次 VM Service URI。
+  - `flutter://connection/status` 已暴露当前连接状态、重连策略和尝试次数。
+  - `runtime_health_check`、`stop_profiling`、`stop_tracking_rebuilds` 已支持 `sessionId`、`observationRole`、`observationLabel`，可把工具结果自动写入 diagnostic session。
+- **验收**：
+  - 断连后客户端会按指数退避重连，并发出连接状态事件。
+  - Agent 可从 Resource 读取当前连接状态，不需要重复调用 `get_app_info` 判断是否在线。
+  - 核心诊断工具输出后，能直接成为 baseline / observation / verification run，后续可用 `compare_diagnostic_runs` 验证修复。
+
 ---
 
 ## 六、推荐执行顺序
@@ -484,12 +499,13 @@ interface DiagnosticFinding {
 | Batch 7 | P2 | Task 3.3 + Task 5.1 | 已完成：增加异步通知和持续监控 |
 | Batch 8 | P2 | Task 4.2 + Task 4.3 + Task 5.2 | 已完成：补齐 shader、network、report |
 | Batch 9 | P2 | Task 5.3 | 已完成：用 demo app 做端到端回归 |
+| Batch 10 | P0 | Task 5.4 | 已完成：连接状态机自动重连，核心工具结果自动写入诊断会话 |
 
 ### 最近三步
 
-1. **先做连接状态机增强**：补自动重连和断连恢复策略，提升长时间监控稳定性。
-2. **再做报告样式增强**：把 HTML 报告升级为更适合分享的视觉版。
-3. **随后做 demo 自动化回归脚本**：把手工复现步骤沉淀成可运行的 smoke test。
+1. **已完成连接状态机增强**：补自动重连和断连恢复策略，提升长时间监控稳定性。
+2. **已完成工具结果自动归档**：核心诊断工具支持直接写入 diagnostic session，降低 Agent 复测流程中的人工粘贴成本。
+3. **下一步做报告样式增强**：把 HTML 报告升级为更适合分享和评审的视觉版。
 
 ---
 

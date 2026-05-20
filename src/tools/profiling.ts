@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { FlutterVmServiceClient } from "../services/vm-service-client.js";
 import { Profiler } from "../services/profiler.js";
@@ -6,6 +7,12 @@ import {
   createFindingId,
 } from "../utils/diagnostic-findings.js";
 import { DiagnosticFinding } from "../types/diagnostics.js";
+import { DiagnosticSessionStore } from "../services/diagnostic-session.js";
+import {
+  appendAutoRecordStatus,
+  autoRecordDiagnosticObservation,
+  DiagnosticObservationRole,
+} from "../utils/diagnostic-recording.js";
 
 function buildProfilingFindings(result: Awaited<ReturnType<Profiler["stop"]>>) {
   const findings: DiagnosticFinding[] = [];
@@ -100,7 +107,8 @@ function buildProfilingFindings(result: Awaited<ReturnType<Profiler["stop"]>>) {
 export function registerProfilingTools(
   server: McpServer,
   client: FlutterVmServiceClient,
-  profiler: Profiler
+  profiler: Profiler,
+  diagnosticSessions?: DiagnosticSessionStore
 ) {
   // 注册 "start_profiling" 工具：启动性能剖析会话
   server.registerTool(
@@ -164,8 +172,22 @@ export function registerProfilingTools(
     {
       description:
         "Stop the current profiling session and get a detailed performance analysis including frame timing, jank detection, CPU hotspots, build/layout/paint phase analysis, and actionable recommendations.",
+      inputSchema: {
+        sessionId: z
+          .string()
+          .optional()
+          .describe("Optional diagnostic session ID to record this result into."),
+        observationRole: z
+          .enum(["baseline", "observation", "verification"])
+          .default("observation")
+          .describe("How to classify this tool result inside the diagnostic session."),
+        observationLabel: z
+          .string()
+          .optional()
+          .describe("Optional label for this recorded diagnostic observation."),
+      },
     },
-    async () => {
+    async ({ sessionId, observationRole, observationLabel }) => {
       if (!client.connected) {
         return {
           content: [
@@ -266,7 +288,22 @@ export function registerProfilingTools(
           output.push(`• ${rec}`);
         }
 
-        appendDiagnosticFindings(output, buildProfilingFindings(result));
+        const findings = buildProfilingFindings(result);
+        appendDiagnosticFindings(output, findings);
+        const reportText = output.join("\n");
+        appendAutoRecordStatus(
+          output,
+          autoRecordDiagnosticObservation({
+            store: diagnosticSessions,
+            sessionId,
+            observationRole: observationRole as DiagnosticObservationRole,
+            observationLabel,
+            sourceTool: "stop_profiling",
+            text: reportText,
+            findings,
+            raw: result,
+          })
+        );
 
         return {
           content: [

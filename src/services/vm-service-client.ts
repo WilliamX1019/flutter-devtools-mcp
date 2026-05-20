@@ -99,6 +99,29 @@ export interface AllocationProfile {
   };
 }
 
+export type ConnectionState =
+  | "disconnected"
+  | "connecting"
+  | "connected"
+  | "reconnecting";
+
+export interface ConnectOptions {
+  autoReconnect?: boolean;
+  maxReconnectAttempts?: number;
+  reconnectBaseDelayMs?: number;
+}
+
+export interface ConnectionStatus {
+  state: ConnectionState;
+  connected: boolean;
+  vmServiceUri: string | null;
+  mainIsolateId: string | null;
+  autoReconnect: boolean;
+  reconnectAttempts: number;
+  maxReconnectAttempts: number;
+  reconnectBaseDelayMs: number;
+}
+
 /**
  * Flutter VM Service 客户端
  * 封装了与 Dart VM Service 的 WebSocket 通信逻辑，提供了各类调试和状态获取的方法
@@ -117,6 +140,13 @@ export class FlutterVmServiceClient extends EventEmitter {
   private _connected = false;
   private _vmServiceUri: string | null = null;
   private _mainIsolateId: string | null = null;
+  private _connectionState: ConnectionState = "disconnected";
+  private autoReconnect = true;
+  private maxReconnectAttempts = 5;
+  private reconnectBaseDelayMs = 1000;
+  private reconnectAttempts = 0;
+  private reconnectTimer: NodeJS.Timeout | null = null;
+  private manualDisconnect = false;
 
   /**
    * 当前是否已连接到 VM Service
@@ -139,30 +169,76 @@ export class FlutterVmServiceClient extends EventEmitter {
     return this._mainIsolateId;
   }
 
+  get connectionState(): ConnectionState {
+    return this._connectionState;
+  }
+
+  get connectionStatus(): ConnectionStatus {
+    return {
+      state: this._connectionState,
+      connected: this._connected,
+      vmServiceUri: this._vmServiceUri,
+      mainIsolateId: this._mainIsolateId,
+      autoReconnect: this.autoReconnect,
+      reconnectAttempts: this.reconnectAttempts,
+      maxReconnectAttempts: this.maxReconnectAttempts,
+      reconnectBaseDelayMs: this.reconnectBaseDelayMs,
+    };
+  }
+
   /**
    * 连接到指定的 VM Service URI
    * @param vmServiceUri VM Service 的 HTTP 或 WebSocket URI
    * @returns 包含 VM 信息的 Promise
    */
-  async connect(vmServiceUri: string): Promise<VMInfo> {
-    if (this._connected) {
+  async connect(vmServiceUri: string, options: ConnectOptions = {}): Promise<VMInfo> {
+    if (this.ws || this._connected || this.reconnectTimer) {
       await this.disconnect();
     }
 
+    this.autoReconnect = options.autoReconnect ?? true;
+    this.maxReconnectAttempts = options.maxReconnectAttempts ?? 5;
+    this.reconnectBaseDelayMs = options.reconnectBaseDelayMs ?? 1000;
+    this.reconnectAttempts = 0;
+    this.manualDisconnect = false;
+    this.clearReconnectTimer();
+    this.setConnectionState("connecting");
+
+    return this.openConnection(vmServiceUri, false);
+  }
+
+  private async openConnection(
+    vmServiceUri: string,
+    isReconnect: boolean
+  ): Promise<VMInfo> {
     const wsUri = this.toWebSocketUri(vmServiceUri);
     this._vmServiceUri = vmServiceUri;
 
     return new Promise((resolve, reject) => {
+      let settled = false;
+      let connectionReady = false;
+      const socket = new WebSocket(wsUri);
+      this.ws = socket;
+
       const timeout = setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        this.setConnectionState("disconnected");
+        socket.close();
         reject(new Error(`Connection timeout after 10s to ${wsUri}`));
       }, 10000);
 
-      this.ws = new WebSocket(wsUri);
-
-      this.ws.on("open", async () => {
+      socket.on("open", async () => {
         clearTimeout(timeout);
+        if (this.ws !== socket) {
+          socket.close();
+          if (!settled) {
+            settled = true;
+            reject(new Error("Connection superseded by a newer socket"));
+          }
+          return;
+        }
         this._connected = true;
-        this.emit("connected");
 
         try {
           const vmInfo = (await this.callMethod("getVM")) as VMInfo;
@@ -172,28 +248,59 @@ export class FlutterVmServiceClient extends EventEmitter {
             this._mainIsolateId = flutterIsolate.id;
           }
           await this.subscribeToStreams();
+          this.reconnectAttempts = 0;
+          this.setConnectionState("connected");
+          if (settled) return;
+          connectionReady = true;
+          settled = true;
+          this.emit(isReconnect ? "reconnected" : "connected", vmInfo);
           resolve(vmInfo);
         } catch (err) {
+          if (settled) return;
+          settled = true;
+          socket.close();
+          this.setConnectionState("disconnected");
           reject(err);
         }
       });
 
-      this.ws.on("message", (data) => {
+      socket.on("message", (data) => {
         this.handleMessage(data.toString());
       });
 
-      this.ws.on("error", (err) => {
+      socket.on("error", (err) => {
         clearTimeout(timeout);
-        this._connected = false;
+        if (this.ws === socket) {
+          this._connected = false;
+        }
         this.emit("error", err);
+        if (settled) return;
+        settled = true;
         reject(err);
       });
 
-      this.ws.on("close", () => {
+      socket.on("close", () => {
+        clearTimeout(timeout);
+        if (this.ws !== socket) return;
+        this.ws = null;
         this._connected = false;
         this._mainIsolateId = null;
         this.rejectAllPending("Connection closed");
         this.emit("disconnected");
+        if (!settled) {
+          settled = true;
+          reject(new Error("Connection closed"));
+        }
+        if (
+          connectionReady &&
+          !this.manualDisconnect &&
+          this.autoReconnect &&
+          this._vmServiceUri
+        ) {
+          this.scheduleReconnect();
+        } else {
+          this.setConnectionState("disconnected");
+        }
       });
     });
   }
@@ -202,6 +309,8 @@ export class FlutterVmServiceClient extends EventEmitter {
    * 断开与 VM Service 的连接
    */
   async disconnect(): Promise<void> {
+    this.manualDisconnect = true;
+    this.clearReconnectTimer();
     if (this.ws) {
       this.rejectAllPending("Disconnecting");
       this.ws.close();
@@ -210,6 +319,7 @@ export class FlutterVmServiceClient extends EventEmitter {
       this._mainIsolateId = null;
       this._vmServiceUri = null;
     }
+    this.setConnectionState("disconnected");
   }
 
   /**
@@ -650,6 +760,55 @@ export class FlutterVmServiceClient extends EventEmitter {
       pending.reject(new Error(reason));
       this.pendingRequests.delete(id);
     }
+  }
+
+  private scheduleReconnect(): void {
+    if (!this._vmServiceUri) return;
+    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+      this.setConnectionState("disconnected");
+      this.emit("reconnect_failed", {
+        attempts: this.reconnectAttempts,
+        vmServiceUri: this._vmServiceUri,
+      });
+      return;
+    }
+
+    this.reconnectAttempts++;
+    const delayMs =
+      this.reconnectBaseDelayMs * Math.pow(2, Math.max(0, this.reconnectAttempts - 1));
+    this.setConnectionState("reconnecting");
+    this.emit("reconnecting", {
+      attempt: this.reconnectAttempts,
+      maxAttempts: this.maxReconnectAttempts,
+      delayMs,
+      vmServiceUri: this._vmServiceUri,
+    });
+
+    this.clearReconnectTimer();
+    this.reconnectTimer = setTimeout(() => {
+      if (!this._vmServiceUri || this.manualDisconnect) return;
+      void this.openConnection(this._vmServiceUri, true).catch((error) => {
+        this.emit("error", error);
+        this.scheduleReconnect();
+      });
+    }, delayMs);
+  }
+
+  private clearReconnectTimer(): void {
+    if (!this.reconnectTimer) return;
+    clearTimeout(this.reconnectTimer);
+    this.reconnectTimer = null;
+  }
+
+  private setConnectionState(state: ConnectionState): void {
+    if (this._connectionState === state) return;
+    const previous = this._connectionState;
+    this._connectionState = state;
+    this.emit("connection_state_changed", {
+      previous,
+      current: state,
+      status: this.connectionStatus,
+    });
   }
 
   /**
