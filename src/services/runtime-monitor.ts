@@ -102,6 +102,8 @@ export class RuntimeMonitor {
   }
 
   private attachListeners(): void {
+    // Monitoring is event-driven: keep listeners lightweight and convert noisy VM
+    // stream events into a bounded alert window for the agent to poll later.
     this.client.on("disconnected", this.onDisconnected);
     this.client.on("stream:Debug", this.onDebugEvent);
     this.client.on("stream:GC", this.onGcEvent);
@@ -169,6 +171,8 @@ export class RuntimeMonitor {
       }
 
       if (this.consecutiveJankCount >= this.thresholds.consecutiveJankFrames) {
+        // Alert on consecutive janky frames rather than individual spikes so
+        // monitoring does not overwhelm the agent with isolated one-off frames.
         this.recordAlert({
           type: "jank",
           severity:
@@ -190,6 +194,8 @@ export class RuntimeMonitor {
       ...input,
     };
     this.alerts.push(alert);
+    // Keep memory bounded for long-running IDE sessions while preserving the most
+    // recent evidence window.
     this.alerts = this.alerts.slice(-this.thresholds.maxAlerts);
     void this.notify?.(alert);
   }
@@ -212,6 +218,8 @@ function isExceptionEvent(event: unknown): boolean {
 
 function extractHeapUsage(event: unknown): number | undefined {
   if (!isRecord(event)) return undefined;
+  // VM Service GC payloads differ by Flutter/Dart version, so check several
+  // known shapes and sum the numeric spaces we can observe.
   const candidates = [
     event.heapUsage,
     event.used,

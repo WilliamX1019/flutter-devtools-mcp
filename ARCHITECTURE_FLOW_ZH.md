@@ -129,3 +129,4 @@ Agent 发起诊断意图
 6. 新增自动写入 diagnostic session 的工具。
 7. 修复闭环从 hot reload 扩展到其他验证方式。
 8. 报告导出内容或格式发生结构性变化。
+9. 本项目有任何工具逻辑、代码接口或架构改动时，需同步更新 [interactive_learning_guide.md](file:///Users/yunlong/Desktop/github/flutter-devtools-mcp/docs/interactive_learning_guide.md) 交互式学习指南，确保新手的学习内容不失效。

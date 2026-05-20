@@ -140,12 +140,15 @@ export class FlutterVmServiceClient extends EventEmitter {
   private _connected = false;
   private _vmServiceUri: string | null = null;
   private _mainIsolateId: string | null = null;
+  // Keep connection state separate from the raw WebSocket flag so MCP resources
+  // can distinguish "trying to recover" from "fully offline".
   private _connectionState: ConnectionState = "disconnected";
   private autoReconnect = true;
   private maxReconnectAttempts = 5;
   private reconnectBaseDelayMs = 1000;
   private reconnectAttempts = 0;
   private reconnectTimer: NodeJS.Timeout | null = null;
+  // Manual disconnects are intentional and must not schedule background reconnects.
   private manualDisconnect = false;
 
   /**
@@ -169,10 +172,16 @@ export class FlutterVmServiceClient extends EventEmitter {
     return this._mainIsolateId;
   }
 
+  /**
+   * High-level connection lifecycle state used by Resources and agent decisions.
+   */
   get connectionState(): ConnectionState {
     return this._connectionState;
   }
 
+  /**
+   * Stable status snapshot exposed through `flutter://connection/status`.
+   */
   get connectionStatus(): ConnectionStatus {
     return {
       state: this._connectionState,
@@ -192,6 +201,7 @@ export class FlutterVmServiceClient extends EventEmitter {
    * @returns 包含 VM 信息的 Promise
    */
   async connect(vmServiceUri: string, options: ConnectOptions = {}): Promise<VMInfo> {
+    // A fresh connect should replace any in-flight socket or scheduled reconnect.
     if (this.ws || this._connected || this.reconnectTimer) {
       await this.disconnect();
     }
@@ -216,6 +226,8 @@ export class FlutterVmServiceClient extends EventEmitter {
 
     return new Promise((resolve, reject) => {
       let settled = false;
+      // Reconnect is only meaningful after the connection reached a usable state.
+      // Initial connection failures should reject the caller instead of looping forever.
       let connectionReady = false;
       const socket = new WebSocket(wsUri);
       this.ws = socket;
@@ -230,6 +242,8 @@ export class FlutterVmServiceClient extends EventEmitter {
 
       socket.on("open", async () => {
         clearTimeout(timeout);
+        // Ignore stale sockets if a newer connect call replaced this one while it
+        // was still handshaking.
         if (this.ws !== socket) {
           socket.close();
           if (!settled) {
@@ -297,6 +311,8 @@ export class FlutterVmServiceClient extends EventEmitter {
           this.autoReconnect &&
           this._vmServiceUri
         ) {
+          // Only unexpected disconnects from a previously healthy connection should
+          // enter the reconnect loop.
           this.scheduleReconnect();
         } else {
           this.setConnectionState("disconnected");
@@ -774,6 +790,8 @@ export class FlutterVmServiceClient extends EventEmitter {
     }
 
     this.reconnectAttempts++;
+    // Simple exponential backoff keeps reconnect responsive for short restarts
+    // without hammering the VM Service while the app is rebuilding.
     const delayMs =
       this.reconnectBaseDelayMs * Math.pow(2, Math.max(0, this.reconnectAttempts - 1));
     this.setConnectionState("reconnecting");
@@ -789,6 +807,7 @@ export class FlutterVmServiceClient extends EventEmitter {
       if (!this._vmServiceUri || this.manualDisconnect) return;
       void this.openConnection(this._vmServiceUri, true).catch((error) => {
         this.emit("error", error);
+        // Failed reconnect attempts keep the same URI and schedule the next backoff step.
         this.scheduleReconnect();
       });
     }, delayMs);

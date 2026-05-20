@@ -419,6 +419,17 @@ This MCP server communicates with your Flutter app through the **Dart VM Service
 
 The MCP server wraps these low-level protocol calls into AI-agent-friendly tools with structured output, severity ratings, and actionable recommendations — so the AI can reason about your app's runtime behavior and suggest concrete fixes.
 
+## 🎓 Developer Learning Guide
+
+If you are new to the codebase or want to understand how the MCP Server communicates with the Dart VM under the hood, check out our **[Interactive Learning Guide](file:///Users/yunlong/Desktop/github/flutter-devtools-mcp/docs/interactive_learning_guide.md)**. 
+
+This guide covers:
+- **Concept Primer**: MCP and Dart VM Service Protocol.
+- **Code Walkthrough**: Deep dive into `vm-service-client.ts` and its Promise-based async bridge.
+- **Interactive Quiz**: 5 self-assessment quiz cards to test your understanding.
+- **Developer Lab**: How to inspect and call tools using the official `MCP Inspector`.
+- **Extension Guide**: Step-by-step tutorial on adding a new debugging tool.
+
 ## Roadmap
 
 - [x] Auto-discover running Flutter apps

@@ -17,6 +17,13 @@ export interface AutoRecordDiagnosticInput extends DiagnosticRecordingInput {
   raw?: unknown;
 }
 
+/**
+ * Best-effort bridge from a tool result to DiagnosticSessionStore.
+ *
+ * Tools should still return their normal report even if recording fails. The
+ * returned status is appended to the report so the agent can see whether the
+ * evidence was actually persisted in the diagnostic session.
+ */
 export function autoRecordDiagnosticObservation(
   input: AutoRecordDiagnosticInput
 ): string | undefined {
@@ -38,6 +45,9 @@ export function autoRecordDiagnosticObservation(
   }
 }
 
+/**
+ * Adds a small, human-readable recording status block to an existing text report.
+ */
 export function appendAutoRecordStatus(
   output: string[],
   status: string | undefined

@@ -282,6 +282,7 @@ record_diagnostic_observation(sessionId, sourceTool="stop_monitoring", role="obs
 5. **断连先看状态资源**：读 `flutter://connection/status`，必要时调用 `reconnect`。
 6. **复测失败要记录**：失败也是证据，应写入 session，避免下一轮重复踩同一条件。
 7. **结束时导出报告**：问题修复或暂停时使用 `export_report` 输出 Markdown/HTML，保留基线、发现、修复建议和复测结论。
+8. **项目更新规范**：如果对本项目源码或核心交互逻辑进行了重构或扩展，必须同步更新 [interactive_learning_guide.md](file:///Users/yunlong/Desktop/github/flutter-devtools-mcp/docs/interactive_learning_guide.md) 交互式学习指南。
 
 ---
 
